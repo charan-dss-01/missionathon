@@ -16,7 +16,7 @@ export default function OrchestratorNode({ data, selected }) {
     <div
       onClick={() => data.onSelect?.('orchestrator')}
       className={`relative w-52 h-52 rounded-full cursor-pointer select-none flex items-center justify-center transition-all duration-300 ${
-        selected ? 'ring-2 ring-primary ring-offset-2' : ''
+        selected ? 'ring-2 ring-teal-600 ring-offset-2' : ''
       }`}
     >
       {/* Target/Source Connection Handles in 4 directions */}
@@ -55,7 +55,10 @@ export default function OrchestratorNode({ data, selected }) {
       )}
 
       {/* Central circular core */}
-      <div className="relative w-48 h-48 rounded-full bg-card border border-border shadow-md flex flex-col items-center justify-center p-3 text-center overflow-hidden">
+      <div
+        style={{ backgroundColor: '#ffffff' }}
+        className="relative w-48 h-48 rounded-full border border-border shadow-md flex flex-col items-center justify-center p-3 text-center overflow-hidden"
+      >
         {/* Subtle radial background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--primary-foreground)_0%,transparent_70%)] opacity-5 pointer-events-none" />
 

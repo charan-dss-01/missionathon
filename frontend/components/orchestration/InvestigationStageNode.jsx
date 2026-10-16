@@ -62,11 +62,12 @@ export default function InvestigationStageNode({ data, selected }) {
   return (
     <div
       onClick={() => data.onSelect?.(data.id)}
-      className={`relative w-[190px] rounded-md border p-2.5 bg-card shadow-sm transition-all duration-200 select-none cursor-pointer ${
+      style={{ backgroundColor: '#ffffff' }}
+      className={`investigation-stage-node relative w-[190px] rounded-md border p-2.5 shadow-sm transition-all duration-200 select-none cursor-pointer ${
         colors.border
       } ${isRunning ? 'ring-2 ring-cyan-500/30 shadow-md' : ''} ${
-        selected ? 'ring-2 ring-primary ring-offset-1' : ''
-      } hover:shadow-md hover:border-primary/50`}
+        selected ? 'is-selected ring-2 ring-teal-600 ring-offset-1' : ''
+      } hover:shadow-md`}
     >
       {/* Handles for sequence and orchestrator radial edges */}
       <Handle type="target" position={Position.Top} id="t" className="w-2 h-2 !bg-border border border-card" />
