@@ -107,7 +107,7 @@ export default function InvestigationDossierPage() {
           {error || 'This investigation does not exist or access is unauthorized under tenant isolation.'}
         </p>
         <Link
-          href="/"
+          href="/overview"
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-xs rounded-md font-medium"
         >
           <ArrowLeft className="w-4 h-4" />

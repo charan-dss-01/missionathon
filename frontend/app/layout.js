@@ -3,8 +3,8 @@ import { AuthProvider } from "@/components/AuthProvider";
 import AppShell from "@/components/AppShell";
 
 export const metadata = {
-  title: "Operations Overview — PhishGuard Control Tower",
-  description: "Cyber operations, agent health and explainable investigation decisions in PhishGuard Control Tower.",
+  title: "PhishGuard AI — Autonomous Cyber Threat Defense",
+  description: "Agentic cyber threat intelligence and deterministic security pipeline.",
 };
 
 export default function RootLayout({ children }) {

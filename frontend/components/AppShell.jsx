@@ -26,7 +26,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { fetchHealth, fetchProviderStatus, fetchInvestigations } from '@/lib/api';
 
 const NAV_ITEMS = [
-  { name: 'Operations Overview', href: '/', icon: LayoutDashboard },
+  { name: 'Operations Overview', href: '/overview', icon: LayoutDashboard },
   { name: 'New Investigation', href: '/investigate', icon: PlusCircle },
   { name: 'Workflows', href: '/history', icon: GitBranch },
   { name: 'Evidence Explorer', href: '/reports', icon: ScanSearch },
@@ -42,6 +42,8 @@ export default function AppShell({ children }) {
   const [health, setHealth] = useState({ status: 'checking' });
   const [providers, setProviders] = useState(null);
   const [reviewCount, setReviewCount] = useState(0);
+
+  const isLandingPage = pathname === '/' || pathname === '/landing';
 
   const checkTelemetry = async () => {
     try {
@@ -61,18 +63,18 @@ export default function AppShell({ children }) {
   };
 
   useEffect(() => {
-    if (pathname === '/landing') return;
+    if (isLandingPage) return;
     checkTelemetry();
     const interval = setInterval(checkTelemetry, 30000);
     return () => clearInterval(interval);
-  }, [pathname]);
+  }, [pathname, isLandingPage]);
 
-  if (pathname === '/landing') {
+  if (isLandingPage) {
     return <>{children}</>;
   }
 
   const getPageTitle = () => {
-    if (pathname === '/') return 'Operations Overview';
+    if (pathname === '/overview' || pathname === '/') return 'Operations Overview';
     if (pathname === '/investigate') return 'New Investigation';
     if (pathname.startsWith('/investigations/')) return 'Investigation Dossier';
     if (pathname === '/history') return 'Workflows';
@@ -93,7 +95,7 @@ export default function AppShell({ children }) {
       {/* Reference App Sidebar */}
       <aside className="app-sidebar">
         {/* Brand */}
-        <Link className="brand active" href="/" title="PhishGuard Control Tower">
+        <Link className="brand active" href="/overview" title="PhishGuard Control Tower">
           <div className="brand-mark">
             <Shield className="w-6 h-6 stroke-[1.8]" />
           </div>

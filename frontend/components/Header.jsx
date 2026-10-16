@@ -32,7 +32,7 @@ export default function Header() {
     <header className="h-16 border-b border-panel-border bg-obsidian-light/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
       {/* Brand & Title */}
       <div className="flex items-center space-x-3">
-        <Link href="/" className="flex items-center space-x-2 group">
+        <Link href="/overview" className="flex items-center space-x-2 group">
           <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 group-hover:border-cyan-400/60 transition">
             <Shield className="w-5 h-5" />
           </div>
