@@ -33,6 +33,8 @@ import {
 import RiskScoreBadge from '@/components/RiskScoreBadge';
 import EvidenceTable from '@/components/EvidenceTable';
 import ExecutionTraceTimeline from '@/components/ExecutionTraceTimeline';
+import VictimTruthView from '@/components/VictimTruthView'; // FEATURE:victim-truth
+import AttackTimeline from '@/components/AttackTimeline'; // FEATURE:timeline
 
 export default function InvestigationDossierPage() {
   const params = useParams();
@@ -306,6 +308,16 @@ export default function InvestigationDossierPage() {
               )}
             </div>
           )}
+
+          <VictimTruthView
+            insights={investigation.insights}
+            metadata={email_metadata}
+            attachments={investigation.attachments || investigation.attachment_analysis?.attachments}
+            urls={investigation.urls}
+            evidence={evidence}
+          /> {/* FEATURE:victim-truth */}
+
+          <AttackTimeline timeline={investigation.insights?.timeline} /> {/* FEATURE:timeline */}
 
           {/* Authoritative Evidence Table */}
           <section className="space-y-2">

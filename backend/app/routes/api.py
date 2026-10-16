@@ -216,6 +216,15 @@ async def list_investigations(
         if status:
             results = [r for r in results if r.review_status == status.upper()]
 
+    # FEATURE:insights
+    for r in results:
+        if r.insights is None and getattr(settings, "FEATURE_INSIGHTS", True):
+            try:
+                from app.services.insights_builder import build_insights
+                r.insights = build_insights(r.email_metadata, "", "", r.urls or [], r.attachments or [], r.evidence or [])
+            except Exception:
+                pass
+
     return results
 
 async def _get_investigation_with_ownership_check(
@@ -239,6 +248,21 @@ async def _get_investigation_with_ownership_check(
 
     if not res:
         raise HTTPException(status_code=404, detail="Investigation not found.")
+
+    # FEATURE:insights
+    if res.insights is None and getattr(settings, "FEATURE_INSIGHTS", True):
+        try:
+            from app.services.insights_builder import build_insights
+            res.insights = build_insights(
+                metadata=res.email_metadata,
+                plain_body="",
+                html_body="",
+                url_findings=res.urls or [],
+                attachment_findings=res.attachments or [],
+                evidence_records=res.evidence or []
+            )
+        except Exception:
+            pass
 
     # Strict multi-tenant authorization
     if res.owner_id and res.owner_id not in ["anonymous", None]:

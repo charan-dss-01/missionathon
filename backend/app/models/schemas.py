@@ -128,6 +128,36 @@ class LLMInterpretation(BaseModel):
     fallback_used: bool = False
     fallback_reason: Optional[str] = None
 
+# FEATURE:insights
+class Deception(BaseModel):
+    kind: str
+    shown: str
+    actual: str
+    rule_ids: List[str] = Field(default_factory=list)
+    explanation: str = ""
+
+# FEATURE:insights
+class ClueLocation(BaseModel):
+    clue_id: str
+    rule_id: str
+    region: str
+    text_span: str
+    label: str = ""
+
+# FEATURE:insights
+class TimelineStep(BaseModel):
+    stage: str
+    title: str
+    rule_ids: List[str] = Field(default_factory=list)
+    mitre_ids: List[str] = Field(default_factory=list)
+    summary: str = ""
+
+# FEATURE:insights
+class Insights(BaseModel):
+    deceptions: List[Deception] = Field(default_factory=list)
+    clues: List[ClueLocation] = Field(default_factory=list)
+    timeline: List[TimelineStep] = Field(default_factory=list)
+
 class InvestigationResult(BaseModel):
     id: str
     owner_id: Optional[str] = None # User ID of the owner in MongoDB
@@ -143,6 +173,7 @@ class InvestigationResult(BaseModel):
     trace: List[TraceStep] = []
     review_status: str = "NEW" # NEW, IN_REVIEW, RESOLVED_MALICIOUS, RESOLVED_BENIGN
     review_notes: Optional[str] = None
+    insights: Optional[Insights] = None # FEATURE:insights
 
 class AnalyzeRequest(BaseModel):
     raw_content: Optional[str] = None
