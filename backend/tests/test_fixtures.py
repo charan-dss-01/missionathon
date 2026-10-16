@@ -114,7 +114,7 @@ async def test_baseline_snapshot():
     expected_snapshots = {
         "benign.eml": {"overall_score": 0, "rating": RiskRatingEnum.LOW, "rules": []},
         "reply_to_mismatch.eml": {"overall_score": 20, "rating": RiskRatingEnum.LOW, "rules": ["HDR_REPLYTO_MISMATCH"]},
-        "auth_failure.eml": {"overall_score": 95, "rating": RiskRatingEnum.HIGH, "rules": ["AUTH_SPF_FAIL", "AUTH_DMARC_FAIL", "BODY_URGENCY_PRESSURE", "BODY_CREDENTIAL_HARVEST"]},
+        "auth_failure.eml": {"overall_score": 100, "rating": RiskRatingEnum.HIGH, "rules": ["AUTH_SPF_FAIL", "AUTH_DMARC_FAIL", "AUTH_DKIM_NONE", "BODY_URGENCY_PRESSURE", "BODY_CREDENTIAL_HARVEST"]},
         "url_mismatch.eml": {"overall_score": 85, "rating": RiskRatingEnum.HIGH, "rules": ["HDR_DISPLAY_NAME_SPOOF", "URL_TEXT_HREF_MISMATCH", "URL_DECEPTIVE_SUBDOMAIN"]}
     }
 
