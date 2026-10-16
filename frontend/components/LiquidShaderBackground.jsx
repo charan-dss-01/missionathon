@@ -152,13 +152,13 @@ const waveFragmentShader = `
     float ao = smoothstep(-1.2, 1.8, vElevation);
     ao = mix(0.72, 1.0, ao);
 
-    // Control Tower Sophisticated Palette:
-    // Deepest valley shadow: rich deep wine/burgundy slate shadow #3d141d (vec3(0.24, 0.08, 0.12))
-    // Midtones: luminous soft pearl with subtle rose-blush sheen #ebdbe0 (vec3(0.92, 0.86, 0.88))
-    // Crest highlights: crisp brilliant white with delicate silver sheen (vec3(0.99, 0.99, 1.0))
-    vec3 shadowCol = vec3(0.24, 0.08, 0.12);
-    vec3 midCol    = vec3(0.92, 0.86, 0.88);
-    vec3 lightCol  = vec3(0.99, 0.99, 1.0);
+    // White and Light-Gray Monochromatic Palette:
+    // Deepest valley shadow: soft light-gray sculptural shadow (vec3(0.72, 0.75, 0.79))
+    // Midtones: luminous soft off-white/light-gray silk (vec3(0.92, 0.94, 0.96))
+    // Crest highlights: crisp brilliant white (vec3(1.0, 1.0, 1.0))
+    vec3 shadowCol = vec3(0.72, 0.75, 0.79);
+    vec3 midCol    = vec3(0.92, 0.94, 0.96);
+    vec3 lightCol  = vec3(1.0, 1.0, 1.0);
 
     float lightSum = light * ao;
     vec3 surfaceColor = mix(shadowCol, midCol, smoothstep(0.12, 0.65, lightSum));
@@ -166,7 +166,7 @@ const waveFragmentShader = `
 
     // Micro-grain dither
     vec2 screenCoord = gl_FragCoord.xy;
-    float grain = (hash(screenCoord * 0.85 + uTime * 0.02) - 0.5) * 0.04;
+    float grain = (hash(screenCoord * 0.85 + uTime * 0.02) - 0.5) * 0.035;
     surfaceColor += vec3(grain);
 
     // Edge Falloff:
@@ -182,7 +182,7 @@ const waveFragmentShader = `
 
     float finalAlpha = smoothstep(0.0, 0.35, envelope);
 
-    // Seamless blend with control tower canvas #f8fafc
+    // Seamless blend with canvas #f8fafc
     vec3 bgCanvasCol = vec3(0.973, 0.980, 0.988); // #f8fafc
     vec3 finalColor = mix(bgCanvasCol, surfaceColor, finalAlpha * 0.94);
 
@@ -225,8 +225,8 @@ const dustFragmentShader = `
     float d = length(coord);
     if (d > 0.5) discard;
     float a = smoothstep(0.5, 0.15, d) * vAlpha;
-    // Glowing crimson / ruby stippled grain matching #80142b brand accent
-    gl_FragColor = vec4(0.50, 0.08, 0.17, a * 0.75);
+    // Subtle monochromatic charcoal/graphite dust grains matching reference recording
+    gl_FragColor = vec4(0.35, 0.38, 0.42, a * 0.45);
   }
 `;
 
@@ -236,8 +236,6 @@ export default function LiquidShaderBackground({ className = '' }) {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Scene
     const scene = new THREE.Scene();
@@ -295,7 +293,7 @@ export default function LiquidShaderBackground({ className = '' }) {
     const waveMesh = new THREE.Mesh(waveGeo, waveMat);
     scene.add(waveMesh);
 
-    // 2. Floating Ambient Dust / Sand Grains (2,400 emerald particles)
+    // 2. Floating Ambient Dust / Sand Grains (2,400 monochromatic graphite particles)
     const dustCount = 2400;
     const dustGeo = new THREE.BufferGeometry();
     const dustPositions = new Float32Array(dustCount * 3);
@@ -357,6 +355,14 @@ export default function LiquidShaderBackground({ className = '' }) {
 
     window.addEventListener('resize', handleResize);
 
+    // Dynamic reduced motion preference listener
+    const motionMediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let reducedMotion = motionMediaQuery.matches;
+    const handleMotionChange = (e) => {
+      reducedMotion = e.matches;
+    };
+    motionMediaQuery.addEventListener('change', handleMotionChange);
+
     // Visibility Management
     let isVisible = true;
     const observer = new IntersectionObserver(
@@ -380,8 +386,8 @@ export default function LiquidShaderBackground({ className = '' }) {
 
       const delta = clock.getDelta();
 
-      if (!prefersReducedMotion) {
-        uniforms.uTime.value += delta * 0.75;
+      if (!reducedMotion) {
+        uniforms.uTime.value += delta * 0.45;
       }
 
       currentMouse.x += (targetMouse.x - currentMouse.x) * 0.045;
@@ -402,6 +408,7 @@ export default function LiquidShaderBackground({ className = '' }) {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
+      motionMediaQuery.removeEventListener('change', handleMotionChange);
       observer.disconnect();
 
       if (renderer.domElement && renderer.domElement.parentNode) {
