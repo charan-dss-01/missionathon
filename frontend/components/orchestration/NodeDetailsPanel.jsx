@@ -76,22 +76,25 @@ export default function NodeDetailsPanel({
   }
 
   return (
-    <div className="absolute top-3 right-3 bottom-3 w-[360px] bg-card border border-border rounded-lg shadow-xl z-20 flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200">
+    <div
+      className="node-details-panel animate-in fade-in slide-in-from-right-4 duration-200"
+      style={{ backgroundColor: '#ffffff', zIndex: 50 }}
+    >
       {/* Panel Header */}
-      <div className="p-3.5 border-b border-border bg-secondary/30 flex items-center justify-between">
+      <div className="panel-header">
         <div className="flex items-center gap-2">
           {isOrchestrator ? (
             <Shield className="w-4 h-4 text-primary" />
           ) : (
             <Activity className="w-4 h-4 text-primary" />
           )}
-          <span className="text-xs font-semibold text-foreground">
+          <span className="text-xs font-semibold text-foreground tracking-tight">
             {isOrchestrator ? 'Orchestrator Telemetry' : 'Stage Execution Record'}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition"
+          className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-slate-200 transition cursor-pointer"
           aria-label="Close details"
         >
           <X className="w-4 h-4" />
@@ -99,7 +102,7 @@ export default function NodeDetailsPanel({
       </div>
 
       {/* Panel Scrollable Body */}
-      <div className="p-4 flex-1 overflow-y-auto space-y-4 text-xs">
+      <div className="panel-body space-y-4 text-xs">
         {isOrchestrator ? (
           /* Orchestrator View */
           <>
@@ -115,7 +118,7 @@ export default function NodeDetailsPanel({
               </p>
             </div>
 
-            <div className="p-3 rounded border border-border bg-background space-y-2">
+            <div className="panel-subcard p-3 space-y-2">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-muted-foreground">Pipeline State:</span>
                 <span className="font-mono font-medium uppercase text-foreground">
@@ -148,7 +151,7 @@ export default function NodeDetailsPanel({
                     <button
                       key={s.id}
                       onClick={() => onSelectNode?.(s.id)}
-                      className="w-full p-2 rounded border border-border/80 bg-background hover:bg-secondary/40 text-left flex items-center justify-between transition cursor-pointer"
+                      className="w-full p-2 rounded border border-border/80 bg-background hover:bg-slate-100 text-left flex items-center justify-between transition cursor-pointer"
                     >
                       <span className="font-mono text-[10px] text-muted-foreground">
                         {s.stepNumber} · {s.name}
@@ -167,7 +170,7 @@ export default function NodeDetailsPanel({
           <>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">
+                <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">
                   STAGE {stageDef?.stepNumber} · {stageDef?.category}
                 </span>
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-medium border ${colors.badge}`}>
@@ -184,14 +187,14 @@ export default function NodeDetailsPanel({
 
             {/* Performance & Finding Metrics */}
             <div className="grid grid-cols-2 gap-2">
-              <div className="p-2.5 rounded border border-border bg-background">
-                <span className="text-[9px] text-muted-foreground block">Execution Duration</span>
+              <div className="panel-subcard p-2.5">
+                <span className="text-[9px] text-muted-foreground block font-medium">Execution Duration</span>
                 <strong className="text-sm font-mono text-foreground mt-0.5 block">
                   {durationText}
                 </strong>
               </div>
-              <div className="p-2.5 rounded border border-border bg-background">
-                <span className="text-[9px] text-muted-foreground block">Findings Recorded</span>
+              <div className="panel-subcard p-2.5">
+                <span className="text-[9px] text-muted-foreground block font-medium">Findings Recorded</span>
                 <strong className="text-sm font-mono text-foreground mt-0.5 block">
                   {currentStage.finding_count ?? stageEvidence.length ?? 0}
                 </strong>
@@ -199,8 +202,8 @@ export default function NodeDetailsPanel({
             </div>
 
             {/* Execution Summary */}
-            <div className="p-3 rounded border border-border bg-background space-y-1">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase font-medium block">
+            <div className="panel-subcard p-3 space-y-1.5">
+              <span className="text-[10px] font-mono text-muted-foreground uppercase font-semibold block">
                 Execution Output Summary
               </span>
               <p className="text-[11px] text-foreground leading-relaxed">
@@ -211,10 +214,10 @@ export default function NodeDetailsPanel({
             {/* Data Summary Key-Values */}
             {currentStage.data_summary && Object.keys(currentStage.data_summary).length > 0 && (
               <div className="space-y-1.5">
-                <span className="text-[10px] font-mono text-muted-foreground uppercase font-medium block">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase font-semibold block">
                   Telemetry Metadata
                 </span>
-                <div className="p-2.5 rounded border border-border bg-background font-mono text-[10px] space-y-1">
+                <div className="panel-subcard p-2.5 font-mono text-[10px] space-y-1">
                   {Object.entries(currentStage.data_summary).map(([k, v]) => (
                     <div key={k} className="flex items-center justify-between gap-2">
                       <span className="text-muted-foreground truncate">{k}:</span>
@@ -230,17 +233,17 @@ export default function NodeDetailsPanel({
             {/* Stage-Contributed Evidence Findings */}
             {stageEvidence.length > 0 && (
               <div className="space-y-2">
-                <span className="text-[10px] font-mono text-muted-foreground uppercase font-medium block">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase font-semibold block">
                   Contributing Evidence ({stageEvidence.length})
                 </span>
                 <div className="space-y-2">
                   {stageEvidence.map((ev, idx) => (
-                    <div key={idx} className="p-2.5 rounded border border-border bg-background space-y-1">
+                    <div key={idx} className="panel-subcard p-3 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-mono text-primary font-semibold">
                           {ev.rule_id}
                         </span>
-                        <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-secondary text-foreground">
+                        <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-800 font-medium">
                           {ev.severity}
                         </span>
                       </div>
@@ -261,7 +264,7 @@ export default function NodeDetailsPanel({
 
       {/* Panel Footer: Prev / Next Navigation */}
       {!isOrchestrator && (
-        <div className="p-3 border-t border-border bg-secondary/20 flex items-center justify-between">
+        <div className="panel-footer">
           <button
             onClick={() => prevStage && onSelectNode?.(prevStage.id)}
             disabled={!prevStage}

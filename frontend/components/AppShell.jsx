@@ -256,11 +256,11 @@ export default function AppShell({ children }) {
             {user ? (
               <button
                 onClick={() => logout()}
-                className="topbar-auth-btn text-muted-foreground hover:text-danger"
+                className="topbar-auth-btn"
                 title="Sign Out"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Logout</span>
+                <span>Logout</span>
               </button>
             ) : (
               <Link

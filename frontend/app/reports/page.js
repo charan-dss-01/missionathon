@@ -15,6 +15,7 @@ import {
   Database
 } from 'lucide-react';
 import { fetchInvestigations, getExportDownloadUrl } from '@/lib/api';
+import { generateInvestigationPdf } from '@/lib/pdfGenerator';
 
 export default function EvidenceExplorerPage() {
   const [investigations, setInvestigations] = useState([]);
@@ -69,7 +70,20 @@ export default function EvidenceExplorerPage() {
       </div>
 
       {/* 2. Format Specifications */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="metric-card border-red-500/25 bg-gradient-to-br from-card to-red-500/[0.04]">
+          <div className="metric-label">
+            <span className="font-semibold text-red-700">Executive Dossier</span>
+            <FileText className="w-4 h-4 text-red-600" />
+          </div>
+          <div className="metric-value font-mono text-sm uppercase text-red-600 font-bold">
+            .PDF Format
+          </div>
+          <div className="metric-foot">
+            <span className="text-red-700/80 font-medium">Audit-ready executive SOC report</span>
+          </div>
+        </div>
+
         <div className="metric-card">
           <div className="metric-label">
             <span>Markdown Dossier</span>
@@ -131,7 +145,7 @@ export default function EvidenceExplorerPage() {
                   <th>Verdict Rating</th>
                   <th>Score</th>
                   <th>Verified Evidence</th>
-                  <th>Download Dossiers</th>
+                  <th className="min-w-[240px]">Download Dossiers</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,30 +179,42 @@ export default function EvidenceExplorerPage() {
                       {inv.evidence?.length || 0} findings
                     </td>
                     <td>
-                      <div className="flex items-center gap-2">
+                      <div className="dossier-actions">
+                        <button
+                          type="button"
+                          onClick={() => generateInvestigationPdf(inv)}
+                          className="dossier-btn dossier-btn-pdf"
+                          title="Generate & Download Executive PDF Dossier"
+                        >
+                          <Download className="w-3 h-3 text-red-600 shrink-0" />
+                          <span>PDF</span>
+                        </button>
                         <a
                           href={getExportDownloadUrl(inv.id, 'md')}
                           download
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-background border border-border text-xs font-mono hover:bg-accent text-foreground"
+                          className="dossier-btn"
                           title="Download Markdown Report"
                         >
-                          <Download className="w-3 h-3" /> MD
+                          <Download className="w-3 h-3 shrink-0" />
+                          <span>MD</span>
                         </a>
                         <a
                           href={getExportDownloadUrl(inv.id, 'csv')}
                           download
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-background border border-border text-xs font-mono hover:bg-accent text-foreground"
-                          title="Download CSV"
+                          className="dossier-btn"
+                          title="Download CSV for SIEM"
                         >
-                          <Download className="w-3 h-3" /> CSV
+                          <Download className="w-3 h-3 shrink-0" />
+                          <span>CSV</span>
                         </a>
                         <a
                           href={getExportDownloadUrl(inv.id, 'json')}
                           download
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-background border border-border text-xs font-mono hover:bg-accent text-foreground"
-                          title="Download JSON"
+                          className="dossier-btn"
+                          title="Download Full JSON Payload"
                         >
-                          <Download className="w-3 h-3" /> JSON
+                          <Download className="w-3 h-3 shrink-0" />
+                          <span>JSON</span>
                         </a>
                       </div>
                     </td>
