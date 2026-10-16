@@ -104,7 +104,7 @@ export default function AppShell({ children }) {
         <div className="workspace-switch">
           <div className="workspace-avatar">P</div>
           <div className="sidebar-label">
-            <strong>Cyber SOC operations</strong>
+            <strong>Cyber SOC Operations</strong>
             <small>Connected workspace</small>
           </div>
           <ChevronDown className="w-3.5 h-3.5 sidebar-label text-muted-foreground ml-auto" />
@@ -127,7 +127,9 @@ export default function AppShell({ children }) {
                 className={`nav-item ${isActive ? 'nav-active active' : ''}`}
                 title={item.name}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <span className="nav-icon-wrap">
+                  <Icon className="w-4 h-4 shrink-0" />
+                </span>
                 <span className="sidebar-label">{item.name}</span>
                 {item.showCount && (
                   <span className="nav-count sidebar-label">
@@ -149,11 +151,11 @@ export default function AppShell({ children }) {
             />
             <div>
               <strong>
-                {isDbConnected ? 'Connected source' : 'Local Instance'}
+                {isDbConnected ? 'Atlas DB Active' : 'Local Instance'}
               </strong>
               <small>
                 {isDbConnected
-                  ? 'MongoDB Atlas supplied'
+                  ? 'MongoDB Atlas live cluster'
                   : 'Backend data local'}
               </small>
             </div>
@@ -164,7 +166,9 @@ export default function AppShell({ children }) {
             className="sidebar-help"
             title="System documentation & integration"
           >
-            <HelpCircle className="w-4 h-4 shrink-0" />
+            <span className="nav-icon-wrap">
+              <HelpCircle className="w-4 h-4 shrink-0" />
+            </span>
             <span className="sidebar-label">Help & integration</span>
             <ArrowUpRight className="w-3.5 h-3.5 sidebar-label ml-auto" />
           </Link>
@@ -188,14 +192,14 @@ export default function AppShell({ children }) {
           <div className="topbar-left">
             <button
               onClick={() => setCollapsed(!collapsed)}
-              className="inline-flex items-center justify-center h-9 w-9 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="topbar-btn"
               title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
               aria-label="Toggle navigation"
             >
               {collapsed ? (
-                <PanelLeft className="w-5 h-5" />
+                <PanelLeft className="w-4 h-4" />
               ) : (
-                <PanelLeftClose className="w-5 h-5" />
+                <PanelLeftClose className="w-4 h-4" />
               )}
             </button>
             <span className="breadcrumb">
@@ -204,38 +208,55 @@ export default function AppShell({ children }) {
           </div>
 
           <div className="topbar-right">
-            <span className="example-label">
-              <span className="health-dot tone-success inline-block mr-1.5" />
+            <span
+              className="example-label"
+              title={
+                providers?.gemini_configured
+                  ? 'Primary LLM: Gemini 1.5 Flash'
+                  : providers?.groq_configured
+                  ? 'Fallback LLM: Groq Llama 3'
+                  : 'Deterministic Rule Engine'
+              }
+            >
+              <span
+                className={`health-dot ${
+                  providers?.gemini_configured || providers?.groq_configured
+                    ? 'tone-success'
+                    : 'tone-info'
+                } inline-block mr-1.5`}
+              />
               {providers?.gemini_configured
-                ? 'Connected AI: Gemini'
+                ? 'Telemetry: Active (Gemini)'
                 : providers?.groq_configured
-                ? 'Connected AI: Groq'
-                : 'Connected data'}
+                ? 'Telemetry: Active (Groq)'
+                : 'Telemetry: Air-Gapped Rules'}
             </span>
 
             <Link
               href="/history"
-              className="inline-flex items-center justify-center h-9 w-9 text-muted-foreground hover:text-foreground"
+              className="topbar-btn"
               title="Search workflows"
+              aria-label="Search workflows"
             >
               <Search className="w-4 h-4" />
             </Link>
 
             <Link
               href="/queue"
-              className="inline-flex items-center justify-center h-9 w-9 text-muted-foreground hover:text-foreground relative"
+              className="topbar-btn relative"
               title="Recent alerts & review queue"
+              aria-label="Recent alerts & review queue"
             >
               <Bell className="w-4 h-4" />
               {reviewCount > 0 && (
-                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="notification-badge" />
               )}
             </Link>
 
             {user ? (
               <button
                 onClick={() => logout()}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-500 px-2 py-1 rounded cursor-pointer"
+                className="topbar-auth-btn text-muted-foreground hover:text-danger"
                 title="Sign Out"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -244,14 +265,15 @@ export default function AppShell({ children }) {
             ) : (
               <Link
                 href="/login"
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary px-2.5 py-1 rounded border border-border"
+                className="topbar-auth-btn"
+                title="Sign In"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>
               </Link>
             )}
 
-            <Link href="/settings/security" title="Profile">
+            <Link href="/settings/security" title={`Account: ${user ? user.name : 'Analyst'}`} className="shrink-0">
               <div className="top-avatar">{userInitial}</div>
             </Link>
           </div>

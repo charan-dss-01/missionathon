@@ -116,9 +116,9 @@ export default function OperationsOverviewPage() {
         </div>
         <div className="page-heading-actions">
           <div className="date-filter-wrap">
-            <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs">
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>16 Oct 2026</span>
+            <button className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-medium border border-border bg-card shadow-sm hover:bg-secondary h-8 rounded-md px-3 text-xs text-muted-foreground">
+              <CalendarDays className="w-3.5 h-3.5 text-primary" />
+              <span>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
             </button>
           </div>
           <Link
@@ -235,13 +235,22 @@ export default function OperationsOverviewPage() {
       {/* 3. Agent Fleet Strip */}
       <div className="agents-strip">
         <span className="agents-strip-label">
-          <Activity className="w-3.5 h-3.5" />
+          <Activity className="w-3.5 h-3.5 text-primary" />
           LANGGRAPH 10-NODE INVESTIGATION FLEET
         </span>
+        <div className="health-indicator hidden sm:flex items-center gap-2">
+          <span className="health-dot tone-success" />
+          <span className="text-muted-foreground text-xs font-mono">
+            Deterministic Rule Engine &amp; Fallback Resilient
+          </span>
+          <span className="health-latency text-xs font-mono text-muted-foreground">
+            {providers?.gemini_configured ? 'Gemini Active' : providers?.groq_configured ? 'Groq Active' : 'Static Mode'}
+          </span>
+        </div>
         <Link
           href="/trace"
           aria-label="View system health & orchestration"
-          className="inline-flex items-center justify-center h-8 w-8 text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center justify-center h-8 w-8 text-muted-foreground hover:text-foreground ml-auto"
           title="View full trace timeline"
         >
           <ArrowUpRight className="w-4 h-4" />
@@ -479,10 +488,10 @@ export default function OperationsOverviewPage() {
           </div>
           <Link
             href="/queue"
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2"
+            className="inline-flex items-center justify-between w-full rounded-md text-xs font-medium border border-border bg-card shadow-sm hover:bg-secondary h-8 px-3 mt-3 text-foreground"
           >
-            Open review queue
-            <ArrowRight className="w-4 h-4" />
+            <span>Open review queue</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </section>
       </div>
