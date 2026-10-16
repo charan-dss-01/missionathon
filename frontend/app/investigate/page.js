@@ -21,8 +21,20 @@ import {
   Lock,
   ExternalLink
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { analyzeFormData, analyzeFormDataStream } from '@/lib/api';
-import InvestigationGraph from '@/components/orchestration/InvestigationGraph';
+
+const InvestigationGraph = dynamic(
+  () => import('@/components/orchestration/InvestigationGraph'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 flex items-center justify-center border border-border/60 rounded-xl bg-card/40 text-xs font-mono text-muted-foreground animate-pulse">
+        Initializing orchestration graph...
+      </div>
+    ),
+  }
+);
 
 const PRESETS = [
   {
