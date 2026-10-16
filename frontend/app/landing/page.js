@@ -98,29 +98,29 @@ export default function PhishGuardLandingPage() {
             <span className="font-semibold text-[17px] tracking-[-0.02em]">PhishGuard<span className="text-neutral-400 font-normal">.ai</span></span>
           </Link>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop Navigation Links matching inspiration */}
           <nav className="hidden md:flex items-center gap-1 bg-neutral-100/80 p-1.5 rounded-full border border-neutral-200/80 text-xs font-medium text-neutral-600 shadow-sm">
             <a href="#how-it-works" className="px-3.5 py-1.5 rounded-full hover:text-neutral-900 hover:bg-white transition-all">
-              Architecture
+              How It Works
             </a>
             <a href="#pipeline" className="px-3.5 py-1.5 rounded-full hover:text-neutral-900 hover:bg-white transition-all">
-              Security Engines
+              Five Agents
             </a>
             <a href="#faqs" className="px-3.5 py-1.5 rounded-full hover:text-neutral-900 hover:bg-white transition-all">
               FAQs
             </a>
             <Link href="/" className="px-3.5 py-1.5 rounded-full hover:text-neutral-900 hover:bg-white transition-all">
-              Control Tower
+              Test Pipeline
             </Link>
           </nav>
 
-          {/* Right Action Button */}
+          {/* Right Action Button matching inspiration */}
           <div className="hidden md:flex items-center gap-3">
             <Link
               href="/investigate"
-              className="inline-flex items-center justify-center bg-neutral-900 text-white hover:bg-black px-4 py-2 rounded-lg text-xs font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="inline-flex items-center justify-center bg-neutral-950 text-white hover:bg-black px-5 py-2.5 rounded-full text-xs font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              New Investigation
+              Launch Pipeline
             </Link>
           </div>
 
@@ -144,14 +144,14 @@ export default function PhishGuardLandingPage() {
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium text-neutral-700 py-1.5"
             >
-              Architecture
+              How It Works
             </a>
             <a
               href="#pipeline"
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium text-neutral-700 py-1.5"
             >
-              Security Engines
+              Five Agents
             </a>
             <a
               href="#faqs"
@@ -165,22 +165,22 @@ export default function PhishGuardLandingPage() {
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium text-neutral-700 py-1.5"
             >
-              Control Tower
+              Test Pipeline
             </Link>
             <Link
               href="/investigate"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full text-center bg-neutral-900 text-white py-2 rounded-lg text-sm font-medium mt-2"
+              className="w-full text-center bg-neutral-950 text-white py-2 rounded-full text-sm font-medium mt-2"
             >
-              New Investigation
+              Launch Pipeline
             </Link>
           </div>
         )}
       </header>
 
-      {/* 2. Hero Section with 3D Liquid GLSL Animated Background */}
+      {/* 2. Hero Section with 3D Stippled Particle Liquid GLSL Animated Background */}
       <section className="relative min-h-[85vh] md:min-h-[92vh] flex items-center justify-center pt-24 pb-20 px-6 overflow-hidden bg-white">
-        {/* Three.js GLSL Liquid Canvas Background */}
+        {/* Three.js Stippled GLSL Liquid Canvas Background */}
         <LiquidShaderBackground className="absolute inset-0 z-0" />
 
         {/* Foreground Content */}
@@ -188,44 +188,43 @@ export default function PhishGuardLandingPage() {
           {/* Eyebrow Pill */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-neutral-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] text-neutral-700 text-xs font-medium mb-7 backdrop-blur-sm animate-fade-in">
             <span className="text-neutral-400 text-xs">✦</span>
-            <span>Agentic Cyber Threat Intelligence</span>
+            <span>Operational AI Infrastructure</span>
           </div>
 
           {/* Main Title matching user reference recording with italic serif accent */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[66px] font-bold text-neutral-900 tracking-[-0.035em] leading-[1.12] mb-6 max-w-3xl">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold text-neutral-900 tracking-[-0.035em] leading-[1.12] mb-6 max-w-3xl">
             Deploy{' '}
-            <span className="font-serif italic font-normal text-neutral-900">
+            <span className="font-serif-italic font-normal text-neutral-950">
               AI agents
             </span>{' '}
             across your security pipeline in minutes.
           </h1>
 
-          {/* Subtitle */}
+          {/* Subtitle matching inspiration */}
           <p className="text-base sm:text-lg text-neutral-600 max-w-2xl font-normal leading-relaxed mb-9">
-            Automate multi-agent static verification, phishing analysis, and deterministic threat
-            audits from inbound email ingestion to human triage with immutable cryptographic evidence.
+            Automate multi-agent physical verification and security audits from inbound receiving to dispute resolution with immutable cryptographic evidence.
           </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto mb-10">
             <Link
               href="/investigate"
-              className="w-full sm:w-auto inline-flex items-center justify-center bg-neutral-900 hover:bg-black text-white px-7 py-3 rounded-full text-sm font-medium shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full sm:w-auto inline-flex items-center justify-center bg-neutral-950 hover:bg-black text-white px-7 py-3 rounded-full text-sm font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              Launch Investigation Trace
+              Launch Pipeline Trace
             </Link>
             <Link
-              href="/"
-              className="w-full sm:w-auto inline-flex items-center justify-center bg-white/90 hover:bg-neutral-50 text-neutral-800 border border-neutral-300/80 px-7 py-3 rounded-full text-sm font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+              href="#how-it-works"
+              className="w-full sm:w-auto inline-flex items-center justify-center bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-300 px-7 py-3 rounded-full text-sm font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              Explore Control Tower
+              See How It Works
             </Link>
           </div>
 
-          {/* Sub-badge: 10-Node LangGraph Investigation Pipeline */}
+          {/* Sub-badge: 5 Specialized Agents Orchestrated matching inspiration */}
           <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-500 tracking-wide">
-            <span className="w-1.5 h-3 bg-neutral-800 rounded-[1px] inline-block" />
-            <span>10-Node LangGraph Investigation Pipeline</span>
+            <span className="w-1.5 h-3 bg-neutral-900 rounded-[1px] inline-block" />
+            <span>5 Specialized Agents Orchestrated</span>
           </div>
         </div>
       </section>

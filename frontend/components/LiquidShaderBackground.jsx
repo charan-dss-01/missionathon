@@ -3,38 +3,35 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-// Vertex Shader: Broad, large-scale, asymmetrical sculptural liquid/fabric surface
-const vertexShader = `
+// Vertex Shader for the Sculpted Stippled Wave Ribbon
+const waveVertexShader = `
   uniform float uTime;
   uniform vec2 uResolution;
+  uniform vec2 uMouse;
 
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewPosition;
   varying float vElevation;
+  varying float vRibbonMask;
   varying vec2 vWorldPos;
 
-  // Stefan Gustavson Simplex 2D noise
+  // 2D Simplex Noise
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
 
   float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187,
-                        0.366025403784439,
-                       -0.577350269189626,
-                        0.024390243902439);
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
     vec2 i  = floor(v + dot(v, C.yy));
     vec2 x0 = v - i + dot(i, C.xx);
     vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
     vec4 x12 = x0.xyxy + C.xxzz;
     x12.xy -= i1;
     i = mod289(i);
-    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
-          + i.x + vec3(0.0, i1.x, 1.0));
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
     vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-    m = m * m;
-    m = m * m;
+    m = m * m; m = m * m;
     vec3 x = 2.0 * fract(p * C.www) - 1.0;
     vec3 h = abs(x) - 0.5;
     vec3 ox = floor(x + 0.5);
@@ -46,67 +43,71 @@ const vertexShader = `
     return 130.0 * dot(m, g);
   }
 
-  // Broad, sculptural wave displacement
-  // Large scale formations with organic asymmetrical topology matching reference
-  float getDisplacement(vec2 p, float t) {
-    // Ultra-low frequency scaling for massive, sweeping sculptural forms
-    vec2 coord = p * 0.18;
+  // Wave elevation matching reference video frames:
+  // Sweeping undulating S-curve:
+  // - High bulbous crest arching across upper-right with deep soft shadow underneath
+  // - Broad sweeping shoulder along the left flank
+  // - Subtle saddle in the center behind the typography
+  float getDisplacement(vec2 p, float t, vec2 mouse) {
+    vec2 coord = p * 0.24;
+    coord += mouse * 0.06;
 
-    // Organic domain warping for smooth liquid silk folds
+    // Organic domain warping for soft fluid folds
     vec2 warp1 = vec2(
-      snoise(coord * 0.75 + vec2(t * 0.02, t * 0.014)),
-      snoise(coord * 0.65 - vec2(t * 0.016, -t * 0.011))
+      snoise(coord * 0.85 + vec2(t * 0.038, t * 0.025)),
+      snoise(coord * 0.75 - vec2(t * 0.032, -t * 0.021))
     );
 
     vec2 warp2 = vec2(
-      snoise(coord * 1.05 + 0.8 * warp1 + vec2(2.1, 6.7) + 0.018 * t),
-      snoise(coord * 0.85 + 0.7 * warp1 + vec2(5.8, 3.2) - 0.014 * t)
+      snoise(coord * 1.1 + 0.7 * warp1 + vec2(2.8, 6.4) + t * 0.028),
+      snoise(coord * 0.9 + 0.65 * warp1 + vec2(5.5, 2.1) - t * 0.022)
     );
 
-    // Asymmetrical Macro Formations:
-    // 1. Left sculptural ridge sweeping down the flank
-    float leftWave = exp(-pow((p.x + 0.35 * p.y + 2.5 + warp2.x * 0.35) * 0.44, 2.0)) * 1.45;
+    // 1. Right Crest: Voluptuous rounded formation arching towards upper-right
+    float rightCrest = exp(-pow((p.x - 2.6 + warp2.x * 0.5) * 0.52, 2.0) - pow((p.y - 0.75 + warp2.y * 0.4) * 0.7, 2.0)) * 2.65;
 
-    // 2. Right sweeping crest arching diagonally across top-right
-    float rightWave = exp(-pow((p.x - 0.6 * p.y - 2.3 + warp2.y * 0.4) * 0.4, 2.0)) * 1.65;
+    // 2. Left Bank: Rolling shoulder across left flank
+    float leftBank = exp(-pow((p.x + 2.8 + warp2.y * 0.45) * 0.46, 2.0) - pow((p.y - 0.25 + warp2.x * 0.35) * 0.65, 2.0)) * 2.15;
 
-    // 3. Central basin ensuring headline text remains crystal clear
-    float centerBasin = -exp(-pow(p.x * 0.58, 2.0) - pow(p.y * 0.58, 2.0)) * 0.55;
+    // 3. Central Basin: Negative space for typography
+    float centerValley = -exp(-pow(p.x * 0.65, 2.0) - pow(p.y * 0.75, 2.0)) * 0.65;
 
-    // Dynamic wave harmonics (very broad, low frequency)
-    float wave1 = sin(coord.x * 0.72 + coord.y * 0.42 + t * 0.075 + warp1.x * 0.5) * 0.55;
-    float wave2 = cos(coord.x * 0.52 - coord.y * 0.78 + t * 0.055 + warp1.y * 0.45) * 0.42;
+    // 4. Undulating flowing waves connecting them into a continuous ribbon
+    float wave1 = sin(coord.x * 1.15 + coord.y * 0.6 + t * 0.095 + warp1.x * 0.6) * 0.45;
+    float wave2 = cos(coord.x * 0.8 - coord.y * 1.1 + t * 0.075 + warp1.y * 0.5) * 0.35;
 
-    float elevation = leftWave + rightWave + centerBasin + wave1 + wave2;
-
-    // Smooth soft curvature
-    elevation = smoothstep(-1.5, 1.5, elevation) * 3.1 - 1.55;
-
-    return elevation;
+    return rightCrest + leftBank + centerValley + wave1 + wave2;
   }
 
   void main() {
     vUv = uv;
     vWorldPos = position.xy;
-
     vec3 pos = position;
     float t = uTime;
 
-    // Displace z-coordinate
-    float disp = getDisplacement(pos.xy, t);
+    // S-curve spine: Ribbon center follows a diagonal curve across the viewport
+    float spineY = sin(pos.x * 0.42 + 0.35) * 0.85 + 0.25;
+    float distFromSpine = abs(pos.y - spineY);
+    
+    // Ribbon envelope mask: Isolates the wave into a floating organic ribbon
+    // Leaves pure clean white space at top, bottom, and edges
+    float ribbonMask = exp(-pow(distFromSpine * 0.58, 2.2));
+    vRibbonMask = ribbonMask;
+
+    // Displace z based on wave elevation attenuated by ribbon envelope
+    float disp = getDisplacement(pos.xy, t, uMouse) * (0.4 + 0.6 * ribbonMask);
     pos.z += disp;
     vElevation = disp;
 
-    // Silky-smooth finite difference normals
+    // Finite difference normal
     float eps = 0.035;
-    float dispX = getDisplacement(pos.xy + vec2(eps, 0.0), t);
-    float dispY = getDisplacement(pos.xy + vec2(0.0, eps), t);
+    float dispX = getDisplacement(pos.xy + vec2(eps, 0.0), t, uMouse) * (0.4 + 0.6 * ribbonMask);
+    float dispY = getDisplacement(pos.xy + vec2(0.0, eps), t, uMouse) * (0.4 + 0.6 * ribbonMask);
 
     vec3 tangentX = normalize(vec3(eps, 0.0, dispX - disp));
     vec3 tangentY = normalize(vec3(0.0, eps, dispY - disp));
     vec3 calculatedNormal = normalize(cross(tangentX, tangentY));
 
-    // View-space transformation
     vNormal = normalize(normalMatrix * calculatedNormal);
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     vViewPosition = -mvPosition.xyz;
@@ -115,8 +116,8 @@ const vertexShader = `
   }
 `;
 
-// Fragment Shader: Ultra-soft monochromatic studio lighting, subtle grain, seamless white fade
-const fragmentShader = `
+// Fragment Shader with Monochromatic Studio Shading and Stochastic Edge Stipples
+const waveFragmentShader = `
   uniform float uTime;
   uniform vec2 uResolution;
 
@@ -124,65 +125,115 @@ const fragmentShader = `
   varying vec3 vNormal;
   varying vec3 vViewPosition;
   varying float vElevation;
+  varying float vRibbonMask;
   varying vec2 vWorldPos;
+
+  // High-frequency pseudo-random hash for fine stipple noise
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
+  }
 
   void main() {
     vec3 normal = normalize(vNormal);
     vec3 viewDir = normalize(vViewPosition);
 
-    // Studio lighting:
-    // Key Light: soft directional studio light from upper right
-    vec3 keyLight = normalize(vec3(0.52, 0.68, 0.52));
-    // Fill Light: subtle ambient fill from opposite side
-    vec3 fillLight = normalize(vec3(-0.5, -0.25, 0.45));
+    // Studio directional lighting:
+    // Key Light from upper right (creates bright porcelain highlights on crests)
+    vec3 keyLight = normalize(vec3(0.55, 0.72, 0.5));
+    float diff1 = pow(max(dot(normal, keyLight) * 0.5 + 0.5, 0.0), 1.45);
 
-    // Wrapped diffuse lighting for creamy, smooth transitions
-    float NdotL1 = dot(normal, keyLight);
-    float diff1 = pow(NdotL1 * 0.5 + 0.5, 1.35);
+    // Fill Light from opposite angle (soft ambient fill in shadow crevices)
+    vec3 fillLight = normalize(vec3(-0.52, -0.22, 0.42));
+    float diff2 = pow(max(dot(normal, fillLight) * 0.5 + 0.5, 0.0), 1.25) * 0.35;
 
-    float NdotL2 = dot(normal, fillLight);
-    float diff2 = pow(NdotL2 * 0.5 + 0.5, 1.25) * 0.32;
-
-    // Soft matte specular highlight (porcelain/silk sheen, gentle and broad)
+    // Soft specular sheen
     vec3 halfDir = normalize(keyLight + viewDir);
-    float NdotH = max(dot(normal, halfDir), 0.0);
-    float spec = pow(NdotH, 16.0) * 0.14;
+    float spec = pow(max(dot(normal, halfDir), 0.0), 20.0) * 0.12;
 
-    // Ambient Occlusion: soft subtle shading in valleys, never harsh or pitch black
-    float ao = smoothstep(-1.5, 1.5, vElevation);
-    ao = mix(0.76, 1.0, ao);
+    float light = clamp(diff1 + diff2, 0.0, 1.0);
 
-    // Refined Monochromatic Palette:
-    // Deepest valley: clean, elegant neutral silver-gray #c2c6cd (0.76, 0.77, 0.80)
-    // Midtones: luminous porcelain off-white #f2f4f6 (0.94, 0.945, 0.955)
-    // Crest highlights: pure studio white #ffffff (1.0, 1.0, 1.0)
-    vec3 shadowColor = vec3(0.75, 0.77, 0.80);
-    vec3 midColor    = vec3(0.94, 0.945, 0.958);
-    vec3 lightColor  = vec3(1.0, 1.0, 1.0);
+    // Soft ambient occlusion in deep valleys
+    float ao = smoothstep(-1.2, 1.8, vElevation);
+    ao = mix(0.72, 1.0, ao);
 
-    float lightSum = clamp(diff1 + diff2, 0.0, 1.0) * ao;
-    vec3 surfaceColor = mix(shadowColor, midColor, smoothstep(0.12, 0.65, lightSum));
-    surfaceColor = mix(surfaceColor, lightColor, smoothstep(0.65, 1.0, lightSum) + spec);
+    // Refined Monochromatic Palette matching reference:
+    // Deepest valley shadow: #505562 to #6c7280 (soft graphite)
+    // Body midtones: #d6d9e0 to #eceef2 (luminous pearl)
+    // Crest highlights: #ffffff (pure studio white)
+    vec3 shadowCol = vec3(0.44, 0.47, 0.53);
+    vec3 midCol    = vec3(0.86, 0.88, 0.91);
+    vec3 lightCol  = vec3(1.0, 1.0, 1.0);
 
-    // Subtle procedural film grain (museum-quality tactile paper/matte silk finish)
-    float grain = (fract(sin(dot(gl_FragCoord.xy * 0.85 + uTime * 0.03, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.035;
+    float lightSum = light * ao;
+    vec3 surfaceColor = mix(shadowCol, midCol, smoothstep(0.12, 0.65, lightSum));
+    surfaceColor = mix(surfaceColor, lightCol, smoothstep(0.65, 1.0, lightSum) + spec);
+
+    // Micro-grain dither for silky sand/matte texture
+    vec2 screenCoord = gl_FragCoord.xy;
+    float grain = (hash(screenCoord * 0.85 + uTime * 0.02) - 0.5) * 0.045;
     surfaceColor += vec3(grain);
 
-    // Edge falloff:
-    // Dissolves seamlessly into the pure white background of the website
-    // Bottom fade blends into the white page below the hero section
-    float bottomFade = smoothstep(0.03, 0.36, vUv.y);
-    float sideFade = smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x);
-    float topFade = smoothstep(1.0, 0.94, vUv.y);
-    float alphaFade = bottomFade * sideFade * topFade;
+    // Edge Falloff:
+    // Blends smoothly into the pure white background
+    float edgeFadeY = smoothstep(0.04, 0.32, vUv.y) * smoothstep(0.98, 0.78, vUv.y);
+    float edgeFadeX = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
+    float envelope = vRibbonMask * edgeFadeY * edgeFadeX;
 
-    // Final color blends gracefully to pure white
-    vec3 finalColor = mix(vec3(1.0, 1.0, 1.0), surfaceColor, alphaFade);
+    // Stochastic Stipple Edge Dissolution:
+    // Where the ribbon fades at the boundary, fine particles disperse into pure white!
+    float stippleThreshold = hash(screenCoord * 1.25);
+    if (envelope < 0.28 && stippleThreshold > envelope / 0.28) {
+      discard; // Disperses into individual stippled grains matching reference!
+    }
+
+    float finalAlpha = smoothstep(0.0, 0.35, envelope);
+
+    // Seamless blend with pure white canvas
+    vec3 finalColor = mix(vec3(1.0, 1.0, 1.0), surfaceColor, finalAlpha * 0.92);
 
     gl_FragColor = vec4(finalColor, 1.0);
   }
 `;
 
+// Floating Ambient Sand / Dust Grains Shaders
+const dustVertexShader = `
+  uniform float uTime;
+  uniform float uDpr;
+  attribute float aSize;
+  attribute float aSeed;
+  varying float vAlpha;
+
+  void main() {
+    vec3 pos = position;
+    float t = uTime * 0.14;
+
+    // Smooth 3D curl drifting around the crest
+    pos.x += sin(t * 0.8 + aSeed * 6.28) * 0.45;
+    pos.y += cos(t * 0.9 + aSeed * 4.15) * 0.4;
+    pos.z += sin(t * 0.6 + aSeed * 8.31) * 0.5;
+
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+
+    gl_PointSize = aSize * (1.0 / -mvPosition.z) * 16.0 * (uDpr * 0.85);
+    gl_PointSize = clamp(gl_PointSize, 1.2, 5.5);
+
+    // Subtle breathing alpha
+    vAlpha = 0.3 + 0.35 * sin(uTime * 0.6 + aSeed * 10.0);
+  }
+`;
+
+const dustFragmentShader = `
+  varying float vAlpha;
+  void main() {
+    vec2 coord = gl_PointCoord - vec2(0.5);
+    float d = length(coord);
+    if (d > 0.5) discard;
+    float a = smoothstep(0.5, 0.15, d) * vAlpha;
+    // Charcoal stippled grain
+    gl_FragColor = vec4(0.42, 0.45, 0.50, a * 0.6);
+  }
+`;
 
 export default function LiquidShaderBackground({ className = '' }) {
   const containerRef = useRef(null);
@@ -191,7 +242,6 @@ export default function LiquidShaderBackground({ className = '' }) {
     const container = containerRef.current;
     if (!container) return;
 
-    // Check prefers-reduced-motion
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Scene
@@ -200,10 +250,10 @@ export default function LiquidShaderBackground({ className = '' }) {
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || 750;
 
-    // Camera setup: broad view with perspective
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.set(0, -0.4, 6.0);
-    camera.lookAt(0, 0.25, 0);
+    // Camera setup: broad perspective viewing the sculpted floating ribbon
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, -0.28, 5.6);
+    camera.lookAt(0, 0.22, 0);
 
     // WebGL Renderer
     let renderer;
@@ -218,56 +268,104 @@ export default function LiquidShaderBackground({ className = '' }) {
       return;
     }
 
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    renderer.setPixelRatio(dpr);
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0xffffff, 1);
+    renderer.setClearColor(0xffffff, 1.0);
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.pointerEvents = 'none';
+
     container.appendChild(renderer.domElement);
 
-    // Geometry: Subdivided plane spanning the viewport
-    const isMobile = width < 768;
-    const segments = isMobile ? 130 : 220;
-    const geometry = new THREE.PlaneGeometry(13.5, 8.2, segments, segments);
-
-    // Shader Material
+    // Uniforms
     const uniforms = {
-      uTime: { value: 0.0 },
+      uTime: { value: 0 },
       uResolution: { value: new THREE.Vector2(width, height) },
+      uMouse: { value: new THREE.Vector2(0, 0) },
+      uDpr: { value: dpr },
     };
 
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms,
-      wireframe: false,
+    // 1. Sculpted Wave Ribbon Mesh with Stochastic Stipple Edge Dissolution
+    // High-density tessellation for fluid organic folds
+    const waveGeo = new THREE.PlaneGeometry(10.2, 6.4, 260, 180);
+    const waveMat = new THREE.ShaderMaterial({
+      vertexShader: waveVertexShader,
+      fragmentShader: waveFragmentShader,
+      uniforms: uniforms,
       side: THREE.DoubleSide,
     });
+    const waveMesh = new THREE.Mesh(waveGeo, waveMat);
+    scene.add(waveMesh);
 
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.rotation.x = -0.36;
-    mesh.rotation.z = -0.04;
-    scene.add(mesh);
+    // 2. Floating Ambient Dust / Sand Grains (2,400 particles drifting around the crest)
+    const dustCount = 2400;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustSizes = new Float32Array(dustCount);
+    const dustSeeds = new Float32Array(dustCount);
 
-    // Animation Loop
-    let animationFrameId;
-    let isVisible = true;
-    let clock = new THREE.Clock();
+    for (let i = 0; i < dustCount; i++) {
+      // Clustered along the diagonal S-curve and upper-right crest
+      const px = (Math.random() - 0.48) * 9.2;
+      const spineY = Math.sin(px * 0.42 + 0.35) * 0.85 + 0.25;
+      const py = spineY + (Math.random() - 0.5) * 2.8;
+      const pz = (Math.random() - 0.15) * 2.5;
 
-    const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
+      dustPositions[i * 3 + 0] = px;
+      dustPositions[i * 3 + 1] = py;
+      dustPositions[i * 3 + 2] = pz;
 
-      if (!isVisible) return;
+      dustSizes[i] = 1.0 + Math.random() * 2.0;
+      dustSeeds[i] = Math.random();
+    }
 
-      const delta = clock.getDelta();
-      // Very slow, continuous, fluid movement (speed tuned for elegance)
-      const speed = prefersReducedMotion ? 0.0 : 0.38;
-      uniforms.uTime.value += delta * speed;
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    dustGeo.setAttribute('aSize', new THREE.BufferAttribute(dustSizes, 1));
+    dustGeo.setAttribute('aSeed', new THREE.BufferAttribute(dustSeeds, 1));
 
-      renderer.render(scene, camera);
+    const dustMat = new THREE.ShaderMaterial({
+      vertexShader: dustVertexShader,
+      fragmentShader: dustFragmentShader,
+      uniforms: uniforms,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.NormalBlending,
+    });
+    const dustMesh = new THREE.Points(dustGeo, dustMat);
+    scene.add(dustMesh);
+
+    // Mouse Interaction
+    const targetMouse = new THREE.Vector2(0, 0);
+    const currentMouse = new THREE.Vector2(0, 0);
+
+    const handleMouseMove = (e) => {
+      const rect = container.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+      targetMouse.set(x, y);
     };
 
-    animate();
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
-    // IntersectionObserver to pause rendering when offscreen
+    // Handle Resize
+    const handleResize = () => {
+      if (!container) return;
+      const newWidth = container.clientWidth;
+      const newHeight = container.clientHeight;
+      camera.aspect = newWidth / newHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(newWidth, newHeight);
+      uniforms.uResolution.value.set(newWidth, newHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Visibility Management
+    let isVisible = true;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -278,68 +376,69 @@ export default function LiquidShaderBackground({ className = '' }) {
     );
     observer.observe(container);
 
-    // Page Visibility API
-    const handleVisibilityChange = () => {
-      isVisible = document.visibilityState === 'visible';
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Animation Loop
+    let animationFrameId;
+    let clock = new THREE.Clock();
 
-    // Window Resize Handler
-    const handleResize = () => {
-      if (!container || !renderer) return;
-      const newWidth = container.clientWidth;
-      const newHeight = container.clientHeight;
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
 
-      camera.aspect = newWidth / newHeight;
-      camera.updateProjectionMatrix();
+      if (!isVisible) return;
 
-      renderer.setSize(newWidth, newHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      uniforms.uResolution.value.set(newWidth, newHeight);
-    };
+      const delta = clock.getDelta();
 
-    window.addEventListener('resize', handleResize);
+      // Fluid, slow, continuous undulation matching reference
+      if (!prefersReducedMotion) {
+        uniforms.uTime.value += delta * 0.75;
+      }
 
-    // WebGL Context Loss Handling
-    const canvas = renderer.domElement;
-    const handleContextLost = (event) => {
-      event.preventDefault();
-      cancelAnimationFrame(animationFrameId);
-    };
+      // Smooth mouse interpolation
+      currentMouse.x += (targetMouse.x - currentMouse.x) * 0.045;
+      currentMouse.y += (targetMouse.y - currentMouse.y) * 0.045;
+      uniforms.uMouse.value.copy(currentMouse);
 
-    const handleContextRestored = () => {
-      handleResize();
-      animate();
+      // Subtle parallax camera tilt
+      camera.position.x = currentMouse.x * 0.16;
+      camera.position.y = -0.28 + currentMouse.y * 0.12;
+      camera.lookAt(0, 0.22, 0);
+
+      renderer.render(scene, camera);
     };
 
-    canvas.addEventListener('webglcontextlost', handleContextLost, false);
-    canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+    animate();
 
     // Cleanup
     return () => {
       cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       observer.disconnect();
 
-      canvas.removeEventListener('webglcontextlost', handleContextLost);
-      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
-
-      geometry.dispose();
-      material.dispose();
-      renderer.dispose();
-
-      if (container && canvas && canvas.parentNode === container) {
-        container.removeChild(canvas);
+      if (renderer.domElement && renderer.domElement.parentNode) {
+        renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
+
+      waveGeo.dispose();
+      waveMat.dispose();
+      dustGeo.dispose();
+      dustMat.dispose();
+      renderer.dispose();
     };
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className={`absolute inset-0 pointer-events-none overflow-hidden select-none bg-white ${className}`}
-      style={{ zIndex: 0 }}
+      className={`liquid-shader-container ${className}`}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: 'hidden',
+        pointerEvents: 'none',
+      }}
       aria-hidden="true"
     />
   );
