@@ -48,7 +48,7 @@ export default function PhishGuardLandingPage() {
       tag: 'Content Heuristics',
       title: 'Body & Urgency Analyzer',
       subtitle: 'Lure & Credential Harvesting Detection',
-      desc: 'Identifies manufactured urgency triggers, fake security notifications, QR code lure payloads, and deceptive anchor text versus href destination mismatches.',
+      desc: 'Identifies manufactured urgency triggers, fake security notifications, financial extortion patterns, and deceptive anchor text versus href destination mismatches.',
       input: 'Decoded text, HTML DOM, embedded URI tokens',
       output: 'BDY Evidence Record',
     },
@@ -64,10 +64,10 @@ export default function PhishGuardLandingPage() {
     {
       stage: 'STAGE 05',
       tag: 'Static Byte Forensics',
-      title: 'Attachment Forensics Engine',
-      subtitle: 'Air-Gapped Payload Triage',
-      desc: 'Performs safe byte-level inspection: file magic signatures, RTLO unicode inversion (\\u202e), double extension tricks, VBA macros, and active scripts without sandbox execution.',
-      input: 'Attachment byte stream, MIME headers',
+      title: 'Attachment & Quishing Engine',
+      subtitle: 'Air-Gapped Payload & QR Triage',
+      desc: 'Performs safe byte-level inspection: file magic signatures, RTLO unicode inversion (\\u202e), double extension tricks, VBA macros, and in-memory QR barcode analysis without sandbox execution.',
+      input: 'Attachment byte stream, MIME headers, QR images',
       output: 'ATT Evidence Record',
     },
   ];
@@ -85,6 +85,14 @@ export default function PhishGuardLandingPage() {
       q: 'How does the deterministic scoring engine compute risk?',
       a: 'Risk ratings are calculated using discrete component scoring (Email Risk vs. Attachment Risk) with correlated indicator damping to prevent false inflation while ensuring critical findings trigger High Risk.',
     },
+    {
+      q: 'What happens if external LLM providers experience rate limits or downtime?',
+      a: 'PhishGuard features a 3-tier resilient fallback: Google Gemini 1.5/2.0 Flash is primary, Groq Llama 3.3 activates automatically on HTTP 429 rate limits, and pure Python deterministic rule templates ensure uninterrupted offline triage if external APIs are unavailable.',
+    },
+    {
+      q: 'How does PhishGuard detect Quishing (QR code phishing)?',
+      a: 'The in-memory QR analyzer inspects image attachments using file magic byte verification and safe pixel limits before decoding. Extracted target URLs are defanged and statically triaged without making live network requests.',
+    },
   ];
 
   return (
@@ -101,16 +109,16 @@ export default function PhishGuardLandingPage() {
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1 bg-[#dcfce7]/80 p-1.5 rounded-full border border-[#86efac]/70 text-xs font-medium text-[#065f46] shadow-xs">
             <a href="#how-it-works" className="px-3.5 py-1.5 rounded-full hover:text-[#064e3b] hover:bg-white transition-all">
-              How It Works
+              Architecture
             </a>
             <a href="#pipeline" className="px-3.5 py-1.5 rounded-full hover:text-[#064e3b] hover:bg-white transition-all">
-              Five Agents
+              Security Engines
             </a>
             <a href="#faqs" className="px-3.5 py-1.5 rounded-full hover:text-[#064e3b] hover:bg-white transition-all">
               FAQs
             </a>
             <Link href="/overview" className="px-3.5 py-1.5 rounded-full hover:text-[#064e3b] hover:bg-white transition-all">
-              Test Pipeline
+              Control Tower
             </Link>
           </nav>
 
@@ -120,7 +128,7 @@ export default function PhishGuardLandingPage() {
               href="/investigate"
               className="inline-flex items-center justify-center bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] px-5 py-2.5 rounded-full text-xs font-semibold shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              Launch Pipeline
+              New Investigation
             </Link>
           </div>
 
@@ -144,14 +152,14 @@ export default function PhishGuardLandingPage() {
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium text-emerald-800 py-1.5"
             >
-              How It Works
+              Architecture
             </a>
             <a
               href="#pipeline"
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium text-emerald-800 py-1.5"
             >
-              Five Agents
+              Security Engines
             </a>
             <a
               href="#faqs"
@@ -165,14 +173,14 @@ export default function PhishGuardLandingPage() {
               onClick={() => setMobileMenuOpen(false)}
               className="text-sm font-medium text-emerald-800 py-1.5"
             >
-              Test Pipeline
+              Control Tower
             </Link>
             <Link
               href="/investigate"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full text-center bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] py-2 rounded-full text-sm font-semibold mt-2"
             >
-              Launch Pipeline
+              New Investigation
             </Link>
           </div>
         )}
@@ -188,21 +196,21 @@ export default function PhishGuardLandingPage() {
           {/* Eyebrow Pill */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#dcfce7]/90 border border-[#86efac]/80 shadow-[0_2px_8px_rgba(16,185,129,0.08)] text-[#065f46] text-xs font-semibold mb-7 backdrop-blur-sm animate-fade-in">
             <span className="text-emerald-500 text-xs">✦</span>
-            <span>Operational AI Infrastructure</span>
+            <span>Tier-2 & Tier-3 SOC Cyber Defense</span>
           </div>
 
           {/* Main Title */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold text-[#064e3b] tracking-[-0.035em] leading-[1.12] mb-6 max-w-3xl">
-            Deploy{' '}
+            Investigate{' '}
             <span className="font-serif-italic font-normal text-emerald-800">
-              AI agents
+              phishing threats
             </span>{' '}
-            across your security pipeline in minutes.
+            with multi-agent forensic precision.
           </h1>
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-emerald-900/80 max-w-2xl font-normal leading-relaxed mb-9">
-            Automate multi-agent physical verification and security audits from inbound receiving to dispute resolution with immutable cryptographic evidence.
+            Autonomous, air-gapped static analysis of suspicious emails, RFC headers, hyperlinks, attachments, and QR codes — backed by deterministic security rules and LangGraph orchestration.
           </p>
 
           {/* CTA Buttons */}
@@ -211,20 +219,20 @@ export default function PhishGuardLandingPage() {
               href="/investigate"
               className="w-full sm:w-auto inline-flex items-center justify-center bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] px-7 py-3 rounded-full text-sm font-semibold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              Launch Pipeline Trace
+              Start Live Investigation
             </Link>
             <Link
               href="/overview"
               className="w-full sm:w-auto inline-flex items-center justify-center bg-white/95 hover:bg-[#f0fdf4] text-[#065f46] border border-emerald-300 px-7 py-3 rounded-full text-sm font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              See How It Works
+              Control Tower Overview
             </Link>
           </div>
 
-          {/* Sub-badge: 5 Specialized Agents Orchestrated */}
+          {/* Sub-badge */}
           <div className="inline-flex items-center gap-2 text-xs font-medium text-emerald-800/80 tracking-wide">
             <span className="w-1.5 h-3 bg-emerald-600 rounded-[1px] inline-block" />
-            <span>5 Specialized Agents Orchestrated</span>
+            <span>10 LangGraph Nodes • 100% Air-Gapped Static Analysis</span>
           </div>
         </div>
       </section>
@@ -236,11 +244,11 @@ export default function PhishGuardLandingPage() {
             SYSTEM ARCHITECTURE
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#064e3b] mb-4">
-            Centralized Orchestration & Cryptographic Evidence Chain
+            Deterministic Rule Grounding & Multi-Tier AI Orchestration
           </h2>
           <p className="text-emerald-900/75 text-sm sm:text-base leading-relaxed">
-            Every incoming sample undergoes rigorous deterministic validation across 5 independent static engines.
-            Verdicts are backed by discrete rule records before LLM explanation synthesis.
+            Every incoming email sample undergoes rigorous static validation across 5 independent inspection engines.
+            Authoritative verdicts are grounded in deterministic Python rules before LLM explanation synthesis.
           </p>
         </div>
 
@@ -252,7 +260,7 @@ export default function PhishGuardLandingPage() {
             </div>
             <h3 className="text-lg font-semibold text-[#064e3b] mb-2">Air-Gapped Static Analysis</h3>
             <p className="text-sm text-emerald-800/80 leading-relaxed">
-              Zero outbound network execution. Suspicious URLs are never fetched, attachments are never executed, and DNS is never probed during triage.
+              Zero outbound network execution. Suspicious URLs are never fetched, attachments are never executed, and external DNS is never probed during triage.
             </p>
           </div>
 
@@ -262,7 +270,7 @@ export default function PhishGuardLandingPage() {
             </div>
             <h3 className="text-lg font-semibold text-[#064e3b] mb-2">Deterministic Scoring Engine</h3>
             <p className="text-sm text-emerald-800/80 leading-relaxed">
-              Discrete component scoring separates Email Risk and Attachment Risk with correlated indicator damping to prevent false inflation.
+              Discrete component scoring separates Email Risk and Attachment Risk with correlated indicator damping to eliminate false score inflation.
             </p>
           </div>
 
@@ -272,7 +280,7 @@ export default function PhishGuardLandingPage() {
             </div>
             <h3 className="text-lg font-semibold text-[#064e3b] mb-2">Strict Anti-Hallucination Gate</h3>
             <p className="text-sm text-emerald-800/80 leading-relaxed">
-              An automated evidence validator verifies all LLM claims against authoritative detection rules; unsupported claims are discarded.
+              An automated evidence validator verifies all LLM claims against authoritative detection rule IDs; unsupported or hallucinated claims are discarded.
             </p>
           </div>
         </div>
@@ -289,7 +297,7 @@ export default function PhishGuardLandingPage() {
               Five Autonomous Security Engines
             </h2>
             <p className="text-emerald-900/75 text-sm sm:text-base leading-relaxed">
-              Each specialized module executes authoritative heuristic checks and returns structured forensic records.
+              Each specialized engine executes authoritative heuristic checks and compiles structured forensic records.
             </p>
           </div>
 
@@ -348,7 +356,7 @@ export default function PhishGuardLandingPage() {
                 href="/investigate"
                 className="mt-6 inline-flex items-center justify-between bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] px-4 py-2.5 rounded-lg text-xs font-semibold hover:bg-[#86efac] transition-all"
               >
-                <span>Launch Pipeline</span>
+                <span>Start Live Investigation</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -399,11 +407,10 @@ export default function PhishGuardLandingPage() {
       <section className="py-20 px-6 bg-[#ecfdf5] border-t border-[#a7f3d0] text-center">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold tracking-tight text-[#064e3b] mb-4">
-            Ready to inspect inbound security telemetry?
+            Ready to investigate suspicious emails and threats?
           </h2>
           <p className="text-emerald-800/80 text-sm sm:text-base max-w-xl mx-auto leading-relaxed mb-8">
-            Launch the interactive Investigation console to analyze suspicious .eml samples, inspect
-            static rule detections, and view the cryptographic trace.
+            Launch the interactive Investigation console to analyze raw .eml files, inspect static rule detections, examine the Victim vs. Truth comparison, and view the execution trace.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
             <Link
@@ -430,7 +437,7 @@ export default function PhishGuardLandingPage() {
           </div>
 
           <div className="font-mono text-emerald-600/70 hidden md:block">
-            Ingest &rarr; Headers | Body &rarr; URLs | Attachments &rarr; Deterministic Evidence
+            Ingest &rarr; RFC Headers | Body &rarr; URLs | Attachments &amp; QR &rarr; Deterministic Evidence
           </div>
 
           <div className="flex items-center gap-4 text-emerald-800/80">
