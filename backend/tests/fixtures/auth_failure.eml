@@ -1,0 +1,10 @@
+From: "PayPal Account Security" <service@paypal.com>
+To: target@acme-corp.com
+Subject: Account Suspension Warning - Immediate Verification Required
+Date: Fri, 16 Oct 2026 10:45:00 +0000
+Message-ID: <spoof.paypal.88371@external-relay.net>
+Authentication-Results: spf=fail dkim=none dmarc=fail header.from=paypal.com
+Content-Type: text/plain; charset="utf-8"
+
+Immediate action required: We have detected suspicious login attempts on your account.
+Your account will be suspended within 24 hours. Confirm your password now.

@@ -1,0 +1,10 @@
+From: "IT Service Desk" <support@trusted-vendor.com>
+Reply-To: attacker-exfiltrate@evil-divert.ru
+To: staff@acme-corp.com
+Subject: Notice: Scheduled Workstation Security Agent Update
+Date: Fri, 16 Oct 2026 10:20:00 +0000
+Message-ID: <support.ticket.19283@trusted-vendor.com>
+Authentication-Results: spf=pass dkim=pass dmarc=pass
+Content-Type: text/plain; charset="utf-8"
+
+Please reply directly to this notice with your computer hostname to confirm scheduled agent deployment.

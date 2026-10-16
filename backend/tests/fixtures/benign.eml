@@ -1,0 +1,15 @@
+From: "Acme HR" <hr@acme-corp.com>
+To: employee@acme-corp.com
+Subject: Open Enrollment Benefits Period - 2026
+Date: Fri, 16 Oct 2026 09:15:00 +0000
+Message-ID: <hr.benefits.20261016@acme-corp.com>
+Authentication-Results: spf=pass dkim=pass dmarc=pass header.from=acme-corp.com
+Content-Type: text/plain; charset="utf-8"
+
+Hi Team,
+
+Annual benefits open enrollment opens on November 1st. Please review your elected healthcare and retirement plans on the internal employee portal:
+https://portal.acme-corp.com/benefits
+
+Best regards,
+Acme HR Operations

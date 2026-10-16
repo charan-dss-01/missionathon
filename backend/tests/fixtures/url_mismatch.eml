@@ -1,0 +1,10 @@
+From: "Microsoft 365 Security" <alert@notifications-secure.com>
+To: corporate-user@acme-corp.com
+Subject: Password Expiry Notification
+Date: Fri, 16 Oct 2026 11:00:00 +0000
+Content-Type: text/html; charset="utf-8"
+
+<html><body>
+<p>Your corporate password expires today. Keep your existing password by verifying here:</p>
+<p><a href="http://login-m365-verify.attacker-portal.net/auth">https://account.microsoft.com/security</a></p>
+</body></html>
