@@ -5,7 +5,13 @@ import re
 from typing import List, Tuple, Dict, Any, Optional
 from bs4 import BeautifulSoup
 
-from app.models.schemas import AttachmentFinding, EvidenceRecord, SeverityEnum, ConfidenceEnum
+from app.models.schemas import (
+    AttachmentFinding,
+    EvidenceRecord,
+    SeverityEnum,
+    ConfidenceEnum,
+    RiskRatingEnum
+)
 from app.engine.rule_definitions import RULE_DEFINITIONS
 
 # High-risk executable/script extensions
@@ -27,6 +33,10 @@ MAGIC_SIGNATURES = [
     (b"%PDF-", "PDF Document", [".pdf"]),
     (b"PK\x03\x04", "ZIP / OOXML Archive", [".zip", ".docx", ".xlsx", ".pptx", ".docm", ".xlsm", ".jar", ".apk"]),
     (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", "OLE Compound Document (Legacy Office)", [".doc", ".xls", ".ppt", ".msg"]),
+    (b"\x89PNG\r\n\x1a\n", "PNG Image", [".png"]),
+    (b"\xff\xd8\xff", "JPEG Image", [".jpg", ".jpeg"]),
+    (b"GIF87a", "GIF Image", [".gif"]),
+    (b"GIF89a", "GIF Image", [".gif"]),
     (b"7z\xbc\xaf\x27\x1c", "7-Zip Archive", [".7z"]),
     (b"Rar!\x1a\x07", "RAR Archive", [".rar"]),
     (b"\x1f\x8b", "GZIP Compressed", [".gz", ".tar.gz"])
@@ -79,7 +89,7 @@ class AttachmentAnalyzer:
             if idx >= cls.MAX_ATTACHMENTS_PER_EMAIL:
                 sha256 = hashlib.sha256(data).hexdigest() if data else ""
                 rule = RULE_DEFINITIONS["ATT_LIMIT_EXCEEDED"]
-                evidence.append(EvidenceRecord(
+                limit_ev = EvidenceRecord(
                     rule_id=rule["rule_id"],
                     category=rule["category"],
                     title=rule["title"],
@@ -92,7 +102,8 @@ class AttachmentAnalyzer:
                     source_location=f"Attachment Index {idx + 1}: {filename}",
                     confidence=ConfidenceEnum.CONFIRMED,
                     limitations="Limits enforced. Inputs beyond limits are marked UNSCANNED, never SAFE."
-                ))
+                )
+                evidence.append(limit_ev)
                 findings.append(AttachmentFinding(
                     filename=filename,
                     declared_mime=declared_mime,
@@ -101,7 +112,12 @@ class AttachmentAnalyzer:
                     sha256=sha256,
                     coverage_status="UNSCANNED",
                     matched_rules=["ATT_LIMIT_EXCEEDED"],
-                    limitations="Exceeds attachments-per-email limit. Marked UNSCANNED, never SAFE."
+                    limitations="Exceeds attachments-per-email limit. Marked UNSCANNED, never SAFE.",
+                    risk_score=0,
+                    risk_level=RiskRatingEnum.UNSCANNED,
+                    recommended_action="Classification inconclusive: attachment exceeds the maximum attachments-per-email limit (10). Marked UNSCANNED (never assume safe). Submit for offline perimeter analysis.",
+                    classification_reason="Unscanned: Exceeds attachments-per-email limit.",
+                    evidence_records=[limit_ev]
                 ))
                 continue
 
@@ -128,7 +144,7 @@ class AttachmentAnalyzer:
         # 1. Check size bounds
         if size_bytes > cls.MAX_INSPECT_BYTES:
             rule = RULE_DEFINITIONS["ATT_LIMIT_EXCEEDED"]
-            ev_list.append(EvidenceRecord(
+            limit_ev = EvidenceRecord(
                 rule_id=rule["rule_id"],
                 category=rule["category"],
                 title=rule["title"],
@@ -141,7 +157,8 @@ class AttachmentAnalyzer:
                 source_location=f"Attachment: {filename}",
                 confidence=ConfidenceEnum.CONFIRMED,
                 limitations="Limits enforced. Inputs beyond limits are marked UNSCANNED, never SAFE."
-            ))
+            )
+            ev_list.append(limit_ev)
             finding = AttachmentFinding(
                 filename=filename,
                 declared_mime=declared_mime,
@@ -150,7 +167,12 @@ class AttachmentAnalyzer:
                 sha256=sha256,
                 coverage_status="OVERSIZED",
                 matched_rules=["ATT_LIMIT_EXCEEDED"],
-                limitations=f"File exceeds inspection limit ({cls.MAX_INSPECT_BYTES / (1024*1024):.1f}MB). Reported as UNSCANNED, never SAFE."
+                limitations=f"File exceeds inspection limit ({cls.MAX_INSPECT_BYTES / (1024*1024):.1f}MB). Reported as UNSCANNED, never SAFE.",
+                risk_score=0,
+                risk_level=RiskRatingEnum.UNSCANNED,
+                recommended_action="Classification inconclusive: file exceeds the 5.0MB safe static inspection limit. Marked UNSCANNED (never assume safe). Submit for offline perimeter analysis.",
+                classification_reason=f"Unscanned: File exceeds inspection limit ({size_bytes / (1024*1024):.1f}MB > 5.0MB).",
+                evidence_records=[limit_ev]
             )
             return finding, ev_list
 
@@ -538,6 +560,15 @@ class AttachmentAnalyzer:
         elif detected_type == "UNKNOWN" and not dangerous_ext:
             coverage = "UNSUPPORTED"
 
+        att_score, att_rating, att_action, att_reason = cls._derive_attachment_assessment(
+            filename=filename,
+            detected_type=detected_type,
+            coverage=coverage,
+            matched_rules=matched_rules,
+            ev_list=ev_list,
+            unparseable_reason=unparseable_reason
+        )
+
         finding = AttachmentFinding(
             filename=filename,
             declared_mime=declared_mime,
@@ -555,7 +586,109 @@ class AttachmentAnalyzer:
             nested_archive_count=nested_count,
             unparseable_reason=unparseable_reason,
             coverage_status=coverage,
-            matched_rules=matched_rules
+            matched_rules=matched_rules,
+            risk_score=att_score,
+            risk_level=att_rating,
+            recommended_action=att_action,
+            classification_reason=att_reason,
+            evidence_records=list(ev_list)
         )
 
         return finding, ev_list
+
+    @classmethod
+    def _derive_attachment_assessment(
+        cls,
+        filename: str,
+        detected_type: str,
+        coverage: str,
+        matched_rules: List[str],
+        ev_list: List[EvidenceRecord],
+        unparseable_reason: Optional[str] = None
+    ) -> Tuple[int, RiskRatingEnum, str, str]:
+        """
+        Derives deterministic individual attachment risk score, rating, actionable recommendation,
+        and human-readable classification reason from specific static findings.
+        """
+        # 1. Calculate raw attachment score from triggered rules
+        score = 0
+        applied_rules = set()
+        for ev in ev_list:
+            if ev.rule_id not in applied_rules:
+                applied_rules.add(ev.rule_id)
+                rule_def = RULE_DEFINITIONS.get(ev.rule_id, {})
+                score += rule_def.get("weight", 15)
+        score = min(100, max(0, score))
+
+        # 2. Determine Risk Rating Level
+        if coverage in ["UNSCANNED", "OVERSIZED"]:
+            rating = RiskRatingEnum.UNSCANNED
+        elif coverage in ["UNKNOWN", "CORRUPT"] and score == 0:
+            rating = RiskRatingEnum.UNKNOWN
+        elif score >= 60 or any(r in matched_rules for r in [
+            "ATT_MIME_MISMATCH", "ATT_RTLO_DETECTED", "ATT_HTML_SMUGGLING",
+            "ATT_ARCHIVE_PASSWORD_IN_BODY", "ATT_DANGEROUS_EXT"
+        ]):
+            rating = RiskRatingEnum.HIGH
+        elif score >= 30 or any(r in matched_rules for r in [
+            "ATT_OFFICE_MACRO_EXT", "ATT_OFFICE_MACRO", "ATT_PDF_ACTIVE_CONTENT",
+            "ATT_ARCHIVE_ENCRYPTED", "ATT_DOUBLE_EXT"
+        ]):
+            rating = RiskRatingEnum.MEDIUM
+        elif coverage == "UNSUPPORTED" and score == 0:
+            rating = RiskRatingEnum.UNKNOWN
+        else:
+            rating = RiskRatingEnum.LOW
+
+        # 3. Deterministic Actionable Recommendations (precedence-ordered)
+        clean_ext = filename.lower()
+        if "ATT_MIME_MISMATCH" in matched_rules:
+            action = "Do not open or execute. Extension conflicts with binary signature (executable disguised as document). Quarantine immediately and escalate to SOC."
+        elif "ATT_ARCHIVE_PASSWORD_IN_BODY" in matched_rules:
+            action = "Do not extract. Password-protected archive with email body unlock key is a confirmed malware delivery technique. Quarantine file."
+        elif "ATT_RTLO_DETECTED" in matched_rules:
+            action = "Do not open. Filename uses Right-to-Left Override spoofing to disguise dangerous extension. Quarantine immediately."
+        elif "ATT_HTML_SMUGGLING" in matched_rules:
+            action = "Do not open in browser. HTML smuggling scripts detected that dynamically assemble payloads in memory. Block and quarantine."
+        elif "ATT_HTML_FORM_SCRIPT" in matched_rules:
+            action = "Do not open. HTML attachment contains credential harvesting password forms or redirect scripts. Block immediately."
+        elif "ATT_DANGEROUS_EXT" in matched_rules:
+            action = "Do not launch. Direct script or executable attachment detected. Block and isolate according to organizational policy."
+        elif "ATT_OFFICE_MACRO_EXT" in matched_rules or "ATT_OFFICE_MACRO" in matched_rules:
+            action = "Verify sender and business necessity out-of-band. Do not enable macros. Analyze in an isolated sandbox environment if required."
+        elif "ATT_PDF_ACTIVE_CONTENT" in matched_rules:
+            action = "Do not open in standard PDF reader. Active executable /Launch or /JavaScript actions detected. Inspect in an isolated sandbox."
+        elif "ATT_ARCHIVE_ENCRYPTED" in matched_rules:
+            action = "Do not extract on standard workstation. Password encryption prevents static inspection. Verify sender through verified corporate channels."
+        elif coverage == "OVERSIZED" or "ATT_LIMIT_EXCEEDED" in matched_rules:
+            action = "Classification inconclusive: file exceeds safe static inspection bounds. Treat as UNSCANNED (never assume safe). Submit for offline perimeter analysis."
+        elif coverage in ["UNKNOWN", "CORRUPT"]:
+            action = "Classification inconclusive: attachment is corrupted, encrypted, or unparseable. Treat as UNKNOWN (never assume safe)."
+        elif coverage == "UNSUPPORTED":
+            action = "Classification inconclusive: file type is not supported for deep structural parsing. Treat as UNKNOWN (never assume safe)."
+        elif score == 0:
+            if clean_ext.endswith(".pdf"):
+                action = "Clean static signature. Standard document hygiene applies. Verify sender through official channel if unexpected; open with approved PDF reader."
+            elif clean_ext.endswith((".docx", ".xlsx")):
+                action = "Clean OpenXML structure. No executable macros or hidden binary streams detected. Normal workflow permitted per security policy."
+            elif clean_ext.endswith(".zip"):
+                action = "Clean archive structure. Contains non-executable files with zero encryption or nested archives. Normal workflow permitted."
+            else:
+                action = "Static inspection found no malicious indicators. Standard operational hygiene applies; verify unexpected sender requests."
+        else:
+            action = "Elevated risk detected. Proceed with caution and request secondary analyst review."
+
+        # 4. Human-readable Classification Reason
+        if rating == RiskRatingEnum.HIGH:
+            reason = f"High Risk ({score}/100): Confirmed high-severity threat signatures detected ({', '.join(matched_rules)})."
+        elif rating == RiskRatingEnum.MEDIUM:
+            reason = f"Medium Risk ({score}/100): Suspicious active content or structural anomalies detected ({', '.join(matched_rules)})."
+        elif rating == RiskRatingEnum.UNSCANNED:
+            reason = f"Unscanned ({score}/100): Attachment exceeds inspection limits ({coverage})."
+        elif rating == RiskRatingEnum.UNKNOWN:
+            reason = f"Unknown Status ({score}/100): Attachment is {unparseable_reason or 'unparseable/encrypted'}; cannot be verified safe."
+        else:
+            reason = f"Low Risk ({score}/100): Valid {detected_type} with 0 detected malicious indicators."
+
+        return score, rating, action, reason
+

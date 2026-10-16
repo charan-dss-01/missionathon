@@ -163,6 +163,14 @@ class MongoDBManager:
                 IndexModel([("event_type", ASCENDING)], name="idx_audit_event_type")
             ])
 
+            # 4. Investigation feedback collection indexes
+            feedback_col = self.get_feedback_col()
+            await feedback_col.create_indexes([
+                IndexModel([("id", ASCENDING)], unique=True, name="idx_feedback_id_unique"),
+                IndexModel([("investigation_id", ASCENDING), ("created_at", DESCENDING)], name="idx_feedback_inv_created"),
+                IndexModel([("category", ASCENDING)], name="idx_feedback_category")
+            ])
+
             logger.info("MongoDB indexes verified successfully.")
         except Exception as e:
             logger.warning(f"Error creating indexes (may already exist): {e}")
@@ -182,6 +190,11 @@ class MongoDBManager:
         if self.db is None:
             raise RuntimeError("MongoDB is not connected. Call connect() first.")
         return self.db["audit_events"]
+
+    def get_feedback_col(self) -> AsyncIOMotorCollection:
+        if self.db is None:
+            raise RuntimeError("MongoDB is not connected. Call connect() first.")
+        return self.db["investigation_feedback"]
 
     @property
     def is_connected(self) -> bool:

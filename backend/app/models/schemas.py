@@ -101,10 +101,41 @@ class AttachmentFinding(BaseModel):
     coverage_status: str = "SCANNED" # SCANNED, UNKNOWN, UNSCANNED, UNSUPPORTED, CORRUPT, OVERSIZED
     matched_rules: List[str] = []
     limitations: str = "Static signature and structure inspection only. Does not guarantee harmlessness."
+    risk_score: int = 0
+    risk_level: RiskRatingEnum = RiskRatingEnum.LOW
+    recommended_action: str = "Standard document hygiene. Verify sender identity if unexpected."
+    classification_reason: str = "Static inspection complete with no high-risk indicators."
+    evidence_records: List[EvidenceRecord] = Field(default_factory=list)
+
+class FeedbackCategoryEnum(str, Enum):
+    FALSE_POSITIVE = "FALSE_POSITIVE"
+    FALSE_NEGATIVE = "FALSE_NEGATIVE"
+    INCORRECT_FILE_TYPE = "INCORRECT_FILE_TYPE"
+    INCORRECT_RISK_LEVEL = "INCORRECT_RISK_LEVEL"
+    OTHER = "OTHER"
+
+class FeedbackCreateRequest(BaseModel):
+    category: FeedbackCategoryEnum
+    attachment_filename: Optional[str] = None
+    explanation: Optional[str] = Field(None, max_length=2000)
+
+class FeedbackRecord(BaseModel):
+    id: str
+    investigation_id: str
+    user_id: Optional[str] = None
+    category: FeedbackCategoryEnum
+    attachment_filename: Optional[str] = None
+    explanation: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str = "SUBMITTED"
+    original_prediction_snapshot: Dict[str, Any] = Field(default_factory=dict)
 
 class ComponentRisk(BaseModel):
-    email_score: int = 0
+    sender_score: int = 0
+    body_score: int = 0
+    url_score: int = 0
     attachment_score: int = 0
+    email_score: int = 0
     overall_score: int = 0
     overall_rating: RiskRatingEnum = RiskRatingEnum.LOW
     contributing_findings: List[str] = []

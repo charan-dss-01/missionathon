@@ -27,14 +27,19 @@ class RiskEngine:
         has_email_body: bool = True,
         has_headers: bool = True
     ) -> ComponentRisk:
-        email_score = 0
+        sender_score = 0
+        body_score = 0
+        url_score = 0
         attachment_score = 0
+        email_score = 0
         contributing_findings: List[str] = []
         applied_rules = set()
 
-        # Categorize evidence into email vs attachment
+        # Categorize evidence into 4 granular vectors: sender, body, urls, attachments
         for record in evidence:
             rule_def = RULE_DEFINITIONS.get(record.rule_id, {})
+            if not rule_def:
+                rule_def = QR_RULE_DEFINITIONS.get(record.rule_id, {})
             weight = rule_def.get("weight", 15)
             
             # Correlated signal damping:
@@ -47,14 +52,25 @@ class RiskEngine:
             applied_rules.add(record.rule_id)
             contributing_findings.append(f"{record.title} (+{weight} pts)")
 
-            if record.category in ["headers", "body", "urls", "authentication"]:
+            # Vector accumulation
+            if record.category in ["headers", "authentication"]:
+                sender_score += weight
+                email_score += weight
+            elif record.category == "body":
+                body_score += weight
+                email_score += weight
+            elif record.category == "urls":
+                url_score += weight
                 email_score += weight
             elif record.category == "attachments":
                 attachment_score += weight
 
         # Bounding scores [0, 100]
-        email_score = min(100, max(0, email_score))
+        sender_score = min(100, max(0, sender_score))
+        body_score = min(100, max(0, body_score))
+        url_score = min(100, max(0, url_score))
         attachment_score = min(100, max(0, attachment_score))
+        email_score = min(100, max(0, email_score))
 
         # Overall score combination:
         # If an attachment has critical malicious traits (e.g. executable, RTLO, macro),
@@ -133,8 +149,11 @@ class RiskEngine:
         scoring_explanation = " ".join(explanation_parts)
 
         return ComponentRisk(
-            email_score=email_score,
+            sender_score=sender_score,
+            body_score=body_score,
+            url_score=url_score,
             attachment_score=attachment_score,
+            email_score=email_score,
             overall_score=overall_score,
             overall_rating=overall_rating,
             contributing_findings=contributing_findings,
