@@ -61,10 +61,15 @@ export default function AppShell({ children }) {
   };
 
   useEffect(() => {
+    if (pathname === '/landing') return;
     checkTelemetry();
     const interval = setInterval(checkTelemetry, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [pathname]);
+
+  if (pathname === '/landing') {
+    return <>{children}</>;
+  }
 
   const getPageTitle = () => {
     if (pathname === '/') return 'Operations Overview';
