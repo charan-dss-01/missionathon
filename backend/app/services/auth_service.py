@@ -119,9 +119,6 @@ class AuthService:
         Never logs passwords, tokens, or raw credentials.
         """
         try:
-            if not db_manager.is_connected:
-                return
-            col = db_manager.get_audit_col()
             record = AuditRecord(
                 id=f"audit-{uuid.uuid4().hex[:12]}",
                 user_id=user_id,
@@ -130,7 +127,12 @@ class AuthService:
                 ip_address=ip_address,
                 details=details or {}
             )
-            await col.insert_one(record.model_dump())
+            if db_manager.is_connected:
+                col = db_manager.get_audit_col()
+                await col.insert_one(record.model_dump())
+            else:
+                from app.storage.memory_store import store
+                store.add_audit(record.model_dump())
         except Exception as e:
             logger.warning(f"Could not persist audit log: {e}")
 
@@ -166,31 +168,16 @@ async def get_current_user(
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
 
-    # Retrieve user from MongoDB if connected
+    # Retrieve user from MongoDB or in-memory store
     if db_manager.is_connected:
         users_col = db_manager.get_users_col()
         doc = await users_col.find_one({"id": user_id})
-        if not doc:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account no longer exists."
-            )
-        if doc.get("status") == "suspended":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account has been suspended by an administrator."
-            )
-        return UserProfileResponse(
-            id=doc["id"],
-            name=doc["name"],
-            email=doc["email"],
-            role=doc.get("role", "user"),
-            status=doc.get("status", "active"),
-            created_at=doc["created_at"],
-            last_login=doc.get("last_login")
-        )
     else:
-        # Fallback to token payload if database is reconnecting
+        from app.storage.memory_store import store
+        doc = store.get_user_by_id(user_id)
+
+    if not doc:
+        # Fallback to token payload if user not in memory / db
         return UserProfileResponse(
             id=user_id,
             name=payload.get("email", "User").split("@")[0].title(),
@@ -199,6 +186,20 @@ async def get_current_user(
             status="active",
             created_at=datetime.now(timezone.utc)
         )
+    if doc.get("status") == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been suspended by an administrator."
+        )
+    return UserProfileResponse(
+        id=doc["id"],
+        name=doc["name"],
+        email=doc["email"],
+        role=doc.get("role", "user"),
+        status=doc.get("status", "active"),
+        created_at=doc["created_at"],
+        last_login=doc.get("last_login")
+    )
 
 
 async def get_optional_current_user(

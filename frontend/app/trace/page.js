@@ -18,11 +18,13 @@ import {
 } from 'lucide-react';
 import { fetchInvestigations, fetchInvestigationById, fetchProviderStatus, fetchHealth } from '@/lib/api';
 import ExecutionTraceTimeline from '@/components/ExecutionTraceTimeline';
+import InvestigationGraph from '@/components/orchestration/InvestigationGraph';
 
 export default function SystemHealthPage() {
   const [investigations, setInvestigations] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [selectedInv, setSelectedInv] = useState(null);
+  const [viewMode, setViewMode] = useState('graph'); // 'graph' | 'timeline'
   const [providers, setProviders] = useState(null);
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -217,7 +219,40 @@ export default function SystemHealthPage() {
 
         {selectedInv ? (
           <div className="space-y-4">
-            <ExecutionTraceTimeline trace={selectedInv.execution_trace || []} />
+            {/* View Mode Toggle: Topology Graph vs Timeline */}
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="table-tabs">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('graph')}
+                  className={`table-tab ${viewMode === 'graph' ? 'active' : ''}`}
+                >
+                  <Activity className="w-3.5 h-3.5 inline mr-1" />
+                  Orchestration Topology Graph
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('timeline')}
+                  className={`table-tab ${viewMode === 'timeline' ? 'active' : ''}`}
+                >
+                  <Clock className="w-3.5 h-3.5 inline mr-1" />
+                  Linear Trace Timeline
+                </button>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {(selectedInv.trace || selectedInv.execution_trace || []).length} Recorded Steps
+              </span>
+            </div>
+
+            {viewMode === 'graph' ? (
+              <InvestigationGraph
+                trace={selectedInv.trace || selectedInv.execution_trace || []}
+                status={selectedInv.status === 'COMPLETED' ? 'completed' : 'idle'}
+                result={selectedInv}
+              />
+            ) : (
+              <ExecutionTraceTimeline trace={selectedInv.trace || selectedInv.execution_trace || []} />
+            )}
           </div>
         ) : (
           <div className="empty-state p-12 text-center text-xs text-muted-foreground">

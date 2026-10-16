@@ -47,6 +47,7 @@ export default function HumanReviewQueuePage() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const selectCaseForReview = (inv) => {

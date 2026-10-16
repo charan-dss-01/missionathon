@@ -29,7 +29,42 @@ class MemoryStore:
     def __init__(self):
         self._lock = threading.Lock()
         self._investigations: Dict[str, InvestigationResult] = {}
+        self._users_by_email: Dict[str, dict] = {}
+        self._users_by_id: Dict[str, dict] = {}
+        self._audit_events: List[dict] = []
         self._seed_demo_data()
+
+    def add_user(self, user_dict: dict) -> None:
+        with self._lock:
+            email = user_dict["email"].lower()
+            self._users_by_email[email] = user_dict
+            self._users_by_id[user_dict["id"]] = user_dict
+
+    def get_user_by_email(self, email: str) -> Optional[dict]:
+        with self._lock:
+            return self._users_by_email.get(email.lower())
+
+    def get_user_by_id(self, user_id: str) -> Optional[dict]:
+        with self._lock:
+            return self._users_by_id.get(user_id)
+
+    def update_user(self, user_id: str, updates: dict) -> Optional[dict]:
+        with self._lock:
+            user = self._users_by_id.get(user_id)
+            if user:
+                user.update(updates)
+                return user
+            return None
+
+    def add_audit(self, audit_dict: dict) -> None:
+        with self._lock:
+            self._audit_events.append(audit_dict)
+
+    def get_audits(self, user_id: Optional[str] = None) -> List[dict]:
+        with self._lock:
+            if user_id:
+                return [a for a in self._audit_events if a.get("user_id") == user_id]
+            return list(self._audit_events)
 
     def add(self, result: InvestigationResult) -> None:
         with self._lock:

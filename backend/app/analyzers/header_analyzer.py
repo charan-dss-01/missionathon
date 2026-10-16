@@ -94,7 +94,7 @@ class HeaderAnalyzer:
                         metadata.inconsistencies.append(f"Display name spoofing '{brand}' from {sender_domain}")
                         break
 
-        # 4. Recorded SPF Failure
+        # 4. Recorded SPF Check (Fail or None)
         spf = (metadata.recorded_auth.spf_result or "").upper()
         if spf in ["FAIL", "SOFTFAIL"]:
             rule = RULE_DEFINITIONS["AUTH_SPF_FAIL"]
@@ -109,8 +109,21 @@ class HeaderAnalyzer:
                 confidence=ConfidenceEnum.CONFIRMED,
                 limitations=rule["limitations"]
             ))
+        elif spf == "NONE" and metadata.recorded_auth.raw_header:
+            rule = RULE_DEFINITIONS["AUTH_SPF_NONE"]
+            evidence.append(EvidenceRecord(
+                rule_id=rule["rule_id"],
+                category=rule["category"],
+                title=rule["title"],
+                severity=rule["severity"],
+                description=rule["description"],
+                supporting_observation=f"Recorded header SPF check recorded as 'none' or unconfigured for '{sender_domain}'.",
+                source_location="Headers: Authentication-Results (SPF)",
+                confidence=ConfidenceEnum.HIGH,
+                limitations=rule["limitations"]
+            ))
 
-        # 5. Recorded DKIM Failure
+        # 5. Recorded DKIM Check (Fail or None)
         dkim = (metadata.recorded_auth.dkim_result or "").upper()
         if dkim == "FAIL":
             rule = RULE_DEFINITIONS["AUTH_DKIM_FAIL"]
@@ -125,8 +138,21 @@ class HeaderAnalyzer:
                 confidence=ConfidenceEnum.CONFIRMED,
                 limitations=rule["limitations"]
             ))
+        elif dkim == "NONE" and metadata.recorded_auth.raw_header:
+            rule = RULE_DEFINITIONS["AUTH_DKIM_NONE"]
+            evidence.append(EvidenceRecord(
+                rule_id=rule["rule_id"],
+                category=rule["category"],
+                title=rule["title"],
+                severity=rule["severity"],
+                description=rule["description"],
+                supporting_observation=f"No passing cryptographic DKIM signature recorded for '{sender_domain}' (recorded status: none).",
+                source_location="Headers: Authentication-Results (DKIM)",
+                confidence=ConfidenceEnum.HIGH,
+                limitations=rule["limitations"]
+            ))
 
-        # 6. Recorded DMARC Failure
+        # 6. Recorded DMARC Check (Fail or None)
         dmarc = (metadata.recorded_auth.dmarc_result or "").upper()
         if dmarc == "FAIL":
             rule = RULE_DEFINITIONS["AUTH_DMARC_FAIL"]
@@ -139,6 +165,19 @@ class HeaderAnalyzer:
                 supporting_observation=f"Recorded header DMARC policy evaluation failed for domain '{sender_domain}'.",
                 source_location="Headers: Authentication-Results (DMARC)",
                 confidence=ConfidenceEnum.CONFIRMED,
+                limitations=rule["limitations"]
+            ))
+        elif dmarc == "NONE" and metadata.recorded_auth.raw_header:
+            rule = RULE_DEFINITIONS["AUTH_DMARC_NONE"]
+            evidence.append(EvidenceRecord(
+                rule_id=rule["rule_id"],
+                category=rule["category"],
+                title=rule["title"],
+                severity=rule["severity"],
+                description=rule["description"],
+                supporting_observation=f"Recorded header DMARC policy evaluation recorded as 'none' or not enforced for '{sender_domain}'.",
+                source_location="Headers: Authentication-Results (DMARC)",
+                confidence=ConfidenceEnum.HIGH,
                 limitations=rule["limitations"]
             ))
 

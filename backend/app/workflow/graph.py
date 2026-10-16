@@ -239,6 +239,7 @@ def analyze_attachments_node(state: InvestigationState) -> Dict[str, Any]:
     node = "analyze_attachments"
     name = "Static Attachment & File Signature Analysis"
     raw_attachments = state.get("raw_attachments", [])
+    plain_body = state.get("plain_body", "")
 
     if not raw_attachments:
         _record_trace(
@@ -247,7 +248,7 @@ def analyze_attachments_node(state: InvestigationState) -> Dict[str, Any]:
         )
         return {"attachment_findings": [], "attachment_evidence": [], "trace": state["trace"]}
 
-    findings, evidence = AttachmentAnalyzer.analyze_attachments(raw_attachments)
+    findings, evidence = AttachmentAnalyzer.analyze_attachments(raw_attachments, email_body=plain_body)
     _record_trace(
         state, node, name, TraceStatusEnum.COMPLETED, t0,
         f"Inspected {len(findings)} attachment(s) statically. Discovered {len(evidence)} risk indicator(s).",

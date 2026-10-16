@@ -217,5 +217,113 @@ RULE_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "weight": 5,
         "description": "The file type or encryption prevents deep static inspection. Status reported as UNKNOWN / UNSCANNED.",
         "limitations": "Never assume an uninspected file is benign. Additional specialized sandbox analysis advised."
+    },
+    "AUTH_SPF_NONE": {
+        "rule_id": "AUTH_SPF_NONE",
+        "category": "authentication",
+        "title": "Recorded SPF Policy Missing or None",
+        "severity": SeverityEnum.LOW,
+        "weight": 5,
+        "description": "Recorded headers indicate spf=none or missing SPF policy for the sender domain.",
+        "limitations": "Extracted strictly from recorded headers; no live DNS queries performed. Not definitive proof of phishing."
+    },
+    "AUTH_DKIM_NONE": {
+        "rule_id": "AUTH_DKIM_NONE",
+        "category": "authentication",
+        "title": "Recorded DKIM Signature Missing or None",
+        "severity": SeverityEnum.LOW,
+        "weight": 5,
+        "description": "Email headers record dkim=none or lack a verified cryptographic DKIM signature pass.",
+        "limitations": "Extracted strictly from recorded headers; no live DNS queries performed."
+    },
+    "AUTH_DMARC_NONE": {
+        "rule_id": "AUTH_DMARC_NONE",
+        "category": "authentication",
+        "title": "Recorded DMARC Policy Missing or None",
+        "severity": SeverityEnum.LOW,
+        "weight": 5,
+        "description": "Recorded headers show dmarc=none or no enforced DMARC policy for the sender domain.",
+        "limitations": "Extracted strictly from recorded headers; no live DNS queries performed."
+    },
+    "ATT_MIME_DECLARED_MISMATCH": {
+        "rule_id": "ATT_MIME_DECLARED_MISMATCH",
+        "category": "attachments",
+        "title": "Declared Content-Type / Signature Discrepancy",
+        "severity": SeverityEnum.HIGH,
+        "weight": 25,
+        "description": "The declared MIME Content-Type contradicts the filename extension or detected binary magic bytes.",
+        "limitations": "Evaluated against standard MIME mappings and magic byte tables."
+    },
+    "ATT_OFFICE_MACRO_EXT": {
+        "rule_id": "ATT_OFFICE_MACRO_EXT",
+        "category": "attachments",
+        "title": "Explicit Macro-Enabled Office Extension",
+        "severity": SeverityEnum.HIGH,
+        "weight": 30,
+        "description": "Attachment carries an explicit macro-enabled Office extension (.docm, .xlsm, .dotm, .xltm).",
+        "limitations": "Static extension check. Macros were not executed."
+    },
+    "ATT_HTML_SMUGGLING": {
+        "rule_id": "ATT_HTML_SMUGGLING",
+        "category": "attachments",
+        "title": "HTML Smuggling Technique Detected",
+        "severity": SeverityEnum.HIGH,
+        "weight": 35,
+        "description": "HTML attachment embeds client-side JavaScript download patterns (Blob, URL.createObjectURL, FileReader, or base64 data) intended to deliver payloads past perimeter firewalls.",
+        "limitations": "Static DOM syntax inspection. JavaScript code was not executed."
+    },
+    "ATT_ARCHIVE_ENCRYPTED": {
+        "rule_id": "ATT_ARCHIVE_ENCRYPTED",
+        "category": "attachments",
+        "title": "Password-Protected / Encrypted Archive",
+        "severity": SeverityEnum.HIGH,
+        "weight": 30,
+        "description": "Archive metadata flags that members are password-encrypted, preventing deep static payload inspection.",
+        "limitations": "Static archive header inspection. Password was not cracked or brute-forced."
+    },
+    "ATT_ARCHIVE_PASSWORD_IN_BODY": {
+        "rule_id": "ATT_ARCHIVE_PASSWORD_IN_BODY",
+        "category": "attachments",
+        "title": "Archive Password Instructed in Message Body",
+        "severity": SeverityEnum.HIGH,
+        "weight": 35,
+        "description": "Email body contains likely password instructions correlating with an encrypted archive attachment, a common evasion pattern.",
+        "limitations": "Heuristic correlation. Passwords are never stored or logged."
+    },
+    "ATT_ARCHIVE_NESTED": {
+        "rule_id": "ATT_ARCHIVE_NESTED",
+        "category": "attachments",
+        "title": "Nested Archive Structure Identified",
+        "severity": SeverityEnum.MEDIUM,
+        "weight": 20,
+        "description": "Archive directory contains nested archive files (.zip, .tar, .7z, .iso), commonly used to evade single-tier security scanners.",
+        "limitations": "Bounded in-memory directory scan. Contents not extracted to disk."
+    },
+    "ATT_ARCHIVE_DEPTH_EXCEEDED": {
+        "rule_id": "ATT_ARCHIVE_DEPTH_EXCEEDED",
+        "category": "attachments",
+        "title": "Archive Nesting Depth Limit Exceeded",
+        "severity": SeverityEnum.HIGH,
+        "weight": 25,
+        "description": "Archive structure exceeds maximum allowed nesting depth (depth > 2). Inner contents marked UNSCANNED.",
+        "limitations": "Enforced bounds to prevent decompression bomb or recursion denial of service."
+    },
+    "ATT_CORRUPT_OR_UNPARSEABLE": {
+        "rule_id": "ATT_CORRUPT_OR_UNPARSEABLE",
+        "category": "attachments",
+        "title": "Corrupt or Unparseable Attachment Structure",
+        "severity": SeverityEnum.MEDIUM,
+        "weight": 15,
+        "description": "Attachment file headers or compression table are corrupt or unparseable. Reported as UNKNOWN with reason.",
+        "limitations": "Parsing blocked by truncated or corrupt data. Never assumed safe."
+    },
+    "ATT_LIMIT_EXCEEDED": {
+        "rule_id": "ATT_LIMIT_EXCEEDED",
+        "category": "attachments",
+        "title": "Attachment Processing Limits Exceeded",
+        "severity": SeverityEnum.MEDIUM,
+        "weight": 15,
+        "description": "Attachment exceeds file size threshold or email exceeds maximum attachment count. Marked UNSCANNED.",
+        "limitations": "Inputs beyond limits are marked UNSCANNED, never SAFE."
     }
 }
