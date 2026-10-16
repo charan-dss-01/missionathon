@@ -152,13 +152,13 @@ const waveFragmentShader = `
     float ao = smoothstep(-1.2, 1.8, vElevation);
     ao = mix(0.72, 1.0, ao);
 
-    // Refined Light Green Cyber Palette:
-    // Deepest valley shadow: rich deep moss/forest green #144230 (vec3(0.08, 0.26, 0.19))
-    // Midtones: luminous soft mint / seafoam green #86efac to #bbf7d0 (vec3(0.55, 0.92, 0.72))
-    // Crest highlights: crisp white with delicate emerald sheen #f4fdf8 (vec3(0.96, 1.0, 0.98))
-    vec3 shadowCol = vec3(0.10, 0.28, 0.20);
-    vec3 midCol    = vec3(0.65, 0.94, 0.78);
-    vec3 lightCol  = vec3(0.98, 1.0, 0.99);
+    // Control Tower Sophisticated Palette:
+    // Deepest valley shadow: rich deep wine/burgundy slate shadow #3d141d (vec3(0.24, 0.08, 0.12))
+    // Midtones: luminous soft pearl with subtle rose-blush sheen #ebdbe0 (vec3(0.92, 0.86, 0.88))
+    // Crest highlights: crisp brilliant white with delicate silver sheen (vec3(0.99, 0.99, 1.0))
+    vec3 shadowCol = vec3(0.24, 0.08, 0.12);
+    vec3 midCol    = vec3(0.92, 0.86, 0.88);
+    vec3 lightCol  = vec3(0.99, 0.99, 1.0);
 
     float lightSum = light * ao;
     vec3 surfaceColor = mix(shadowCol, midCol, smoothstep(0.12, 0.65, lightSum));
@@ -182,8 +182,8 @@ const waveFragmentShader = `
 
     float finalAlpha = smoothstep(0.0, 0.35, envelope);
 
-    // Seamless blend with light green canvas #f0fdf4
-    vec3 bgCanvasCol = vec3(0.941, 0.992, 0.957); // #f0fdf4
+    // Seamless blend with control tower canvas #f8fafc
+    vec3 bgCanvasCol = vec3(0.973, 0.980, 0.988); // #f8fafc
     vec3 finalColor = mix(bgCanvasCol, surfaceColor, finalAlpha * 0.94);
 
     gl_FragColor = vec4(finalColor, 1.0);
@@ -225,8 +225,8 @@ const dustFragmentShader = `
     float d = length(coord);
     if (d > 0.5) discard;
     float a = smoothstep(0.5, 0.15, d) * vAlpha;
-    // Glowing emerald / mint stippled grain
-    gl_FragColor = vec4(0.12, 0.62, 0.38, a * 0.7);
+    // Glowing crimson / ruby stippled grain matching #80142b brand accent
+    gl_FragColor = vec4(0.50, 0.08, 0.17, a * 0.75);
   }
 `;
 
@@ -266,7 +266,7 @@ export default function LiquidShaderBackground({ className = '' }) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     renderer.setPixelRatio(dpr);
     renderer.setSize(width, height);
-    renderer.setClearColor(0xf0fdf4, 1.0); // Soft light green #f0fdf4
+    renderer.setClearColor(0xf8fafc, 1.0); // Clean subtle off-white #f8fafc
     renderer.domElement.style.position = 'absolute';
     renderer.domElement.style.top = '0';
     renderer.domElement.style.left = '0';
