@@ -11,7 +11,10 @@ from app.config import settings
 from app.models.schemas import (
     InvestigationResult,
     ProviderStatus,
-    AnalyzeRequest
+    AnalyzeRequest,
+    FeedbackCreateRequest,
+    FeedbackRecord,
+    FeedbackCategoryEnum
 )
 from app.models.user import UserProfileResponse
 from app.storage.memory_store import store
@@ -529,6 +532,120 @@ async def update_review_status(
     store.update_review(inv_id, res.review_status, res.review_notes)
     return res
 
+@router.post("/investigations/{inv_id}/feedback", response_model=FeedbackRecord, status_code=status.HTTP_201_CREATED)
+async def submit_investigation_feedback(
+    inv_id: str,
+    req: FeedbackCreateRequest,
+    current_user: Optional[UserProfileResponse] = Depends(get_optional_current_user)
+):
+    """
+    Submits user feedback regarding an incorrect classification, false positive,
+    false negative, or wrong file type detection.
+    Persists feedback with original prediction snapshot to MongoDB and memory store.
+    """
+    res = await _get_investigation_with_ownership_check(inv_id, current_user)
+
+    # Validate attachment reference if provided
+    if req.attachment_filename:
+        filename_clean = req.attachment_filename.strip().lower()
+        attachment_matches = [
+            a for a in (res.attachments or [])
+            if a.filename.strip().lower() == filename_clean
+        ]
+        if not attachment_matches:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Attachment '{req.attachment_filename}' was not found in investigation '{inv_id}'."
+            )
+
+    # Build snapshot of original prediction at submission time
+    snapshot: Dict[str, Any] = {
+        "overall_score": res.risk.overall_score if res.risk else 0,
+        "overall_rating": res.risk.overall_rating.value if res.risk else "UNKNOWN",
+        "sender_score": getattr(res.risk, "sender_score", 0) if res.risk else 0,
+        "body_score": getattr(res.risk, "body_score", 0) if res.risk else 0,
+        "url_score": getattr(res.risk, "url_score", 0) if res.risk else 0,
+        "attachment_score": res.risk.attachment_score if res.risk else 0,
+        "email_score": res.risk.email_score if res.risk else 0,
+        "total_evidence_count": len(res.evidence or []),
+        "evidence_rule_ids": [e.rule_id for e in (res.evidence or [])],
+        "review_status": res.review_status or "NEW",
+    }
+    if req.attachment_filename:
+        target_att = next(
+            (a for a in (res.attachments or []) if a.filename.strip().lower() == req.attachment_filename.strip().lower()),
+            None
+        )
+        if target_att:
+            snapshot["attachment_finding"] = {
+                "filename": target_att.filename,
+                "detected_type": target_att.detected_type,
+                "declared_mime": target_att.declared_mime,
+                "risk_score": getattr(target_att, "risk_score", 0),
+                "risk_level": target_att.risk_level.value if hasattr(target_att.risk_level, "value") else str(target_att.risk_level),
+                "matched_rules": target_att.matched_rules,
+                "coverage_status": target_att.coverage_status
+            }
+
+    # Anti-duplicate policy: check if identical submission occurred in last 60 seconds
+    now = datetime.now(timezone.utc)
+    existing_records = store.get_feedback_for_investigation(inv_id)
+    clean_explanation = req.explanation.strip() if req.explanation else None
+    for prev in existing_records:
+        if (
+            prev.category == req.category
+            and prev.attachment_filename == req.attachment_filename
+            and prev.explanation == clean_explanation
+        ):
+            time_diff = (now - prev.created_at).total_seconds()
+            if time_diff < 60:
+                return prev
+
+    fb_id = f"fb-{uuid.uuid4().hex[:8]}"
+    feedback_record = FeedbackRecord(
+        id=fb_id,
+        investigation_id=inv_id,
+        user_id=current_user.id if current_user else "anonymous",
+        category=req.category,
+        attachment_filename=req.attachment_filename,
+        explanation=clean_explanation,
+        created_at=now,
+        status="SUBMITTED",
+        original_prediction_snapshot=snapshot
+    )
+
+    if db_manager.is_connected:
+        col = db_manager.get_feedback_col()
+        doc = feedback_record.model_dump()
+        doc["_id"] = fb_id
+        await col.replace_one({"_id": fb_id}, doc, upsert=True)
+
+    store.add_feedback(feedback_record)
+    return feedback_record
+
+@router.get("/investigations/{inv_id}/feedback", response_model=List[FeedbackRecord])
+async def list_investigation_feedback(
+    inv_id: str,
+    current_user: Optional[UserProfileResponse] = Depends(get_optional_current_user)
+):
+    """
+    Retrieves all submitted feedback records for a specific investigation.
+    """
+    await _get_investigation_with_ownership_check(inv_id, current_user)
+
+    if db_manager.is_connected:
+        col = db_manager.get_feedback_col()
+        cursor = col.find({"investigation_id": inv_id}).sort("created_at", -1)
+        db_records = []
+        async for doc in cursor:
+            doc.pop("_id", None)
+            db_records.append(FeedbackRecord(**doc))
+        if db_records:
+            return db_records
+
+    return store.get_feedback_for_investigation(inv_id)
+
+
 @router.get("/investigations/{inv_id}/export")
 async def export_investigation(
     inv_id: str,
@@ -552,7 +669,11 @@ async def export_investigation(
     if fmt == "csv":
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Investigation ID", "Created At", "Risk Rating", "Risk Score", "Email Score", "Attachment Score", "Rule ID", "Finding Title", "Severity", "Observation"])
+        writer.writerow([
+            "Investigation ID", "Created At", "Risk Rating", "Risk Score",
+            "Sender Score", "Body Score", "URL Score", "Attachment Score",
+            "Email Score", "Rule ID", "Finding Title", "Severity", "Observation"
+        ])
         
         if res.evidence:
             for ev in res.evidence:
@@ -561,8 +682,11 @@ async def export_investigation(
                     _sanitize_csv(res.created_at.isoformat()),
                     _sanitize_csv(res.risk.overall_rating.value),
                     _sanitize_csv(res.risk.overall_score),
-                    _sanitize_csv(res.risk.email_score),
+                    _sanitize_csv(getattr(res.risk, "sender_score", 0)),
+                    _sanitize_csv(getattr(res.risk, "body_score", 0)),
+                    _sanitize_csv(getattr(res.risk, "url_score", 0)),
                     _sanitize_csv(res.risk.attachment_score),
+                    _sanitize_csv(res.risk.email_score),
                     _sanitize_csv(ev.rule_id),
                     _sanitize_csv(ev.title),
                     _sanitize_csv(ev.severity.value),
@@ -574,8 +698,11 @@ async def export_investigation(
                 _sanitize_csv(res.created_at.isoformat()),
                 _sanitize_csv(res.risk.overall_rating.value),
                 _sanitize_csv(res.risk.overall_score),
-                _sanitize_csv(res.risk.email_score),
+                _sanitize_csv(getattr(res.risk, "sender_score", 0)),
+                _sanitize_csv(getattr(res.risk, "body_score", 0)),
+                _sanitize_csv(getattr(res.risk, "url_score", 0)),
                 _sanitize_csv(res.risk.attachment_score),
+                _sanitize_csv(res.risk.email_score),
                 "NONE", "No High Risk Indicators", "LOW", "Clean static analysis"
             ])
 
@@ -584,11 +711,15 @@ async def export_investigation(
         return response
 
     elif fmt == "markdown":
+        sender_sc = getattr(res.risk, "sender_score", 0)
+        body_sc = getattr(res.risk, "body_score", 0)
+        url_sc = getattr(res.risk, "url_score", 0)
         md_lines = [
             f"# PhishGuard AI — Investigation Dossier `{res.id}`",
             f"**Generated:** {res.created_at.isoformat()}Z  ",
             f"**Risk Score:** {res.risk.overall_score}/100 ({res.risk.overall_rating.value})  ",
-            f"**Email Vector Score:** {res.risk.email_score}/100 | **Attachment Score:** {res.risk.attachment_score}/100  ",
+            f"**4-Way Risk Breakdown:** Sender: {sender_sc}/100 | Body: {body_sc}/100 | URLs: {url_sc}/100 | Attachments: {res.risk.attachment_score}/100  ",
+            f"**Combined Email Vector:** {res.risk.email_score}/100  ",
             f"**Coverage Status:** {res.risk.coverage_status.value}  ",
             f"**Scoring Explanation:** {res.risk.scoring_explanation}  ",
             "",

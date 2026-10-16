@@ -27,12 +27,15 @@ import {
   FileQuestion,
   AlertOctagon,
   HelpCircle,
-  Activity
+  Activity,
+  Flag,
+  MessageSquare
 } from 'lucide-react';
 import {
   fetchInvestigationById,
   updateReviewStatus,
-  getExportDownloadUrl
+  getExportDownloadUrl,
+  fetchInvestigationFeedback
 } from '@/lib/api';
 import RiskScoreBadge from '@/components/RiskScoreBadge';
 import SeverityBadge from '@/components/SeverityBadge';
@@ -41,6 +44,9 @@ import ExecutionTraceTimeline from '@/components/ExecutionTraceTimeline';
 import InvestigationGraph from '@/components/orchestration/InvestigationGraph';
 import VictimTruthView from '@/components/VictimTruthView'; // FEATURE:victim-truth
 import AttackTimeline from '@/components/AttackTimeline'; // FEATURE:timeline
+import AttachmentReportCard from '@/components/AttachmentReportCard';
+import ClassificationFeedbackModal from '@/components/ClassificationFeedbackModal';
+import RiskVectorBreakdown from '@/components/RiskVectorBreakdown';
 
 export default function InvestigationDossierPage() {
   const params = useParams();
@@ -55,6 +61,9 @@ export default function InvestigationDossierPage() {
   const [updatingReview, setUpdatingReview] = useState(false);
   const [reviewToast, setReviewToast] = useState(false);
   const [traceViewMode, setTraceViewMode] = useState('graph'); // 'graph' | 'timeline'
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackTargetAttachment, setFeedbackTargetAttachment] = useState('');
+  const [feedbackHistory, setFeedbackHistory] = useState([]);
 
   useEffect(() => {
     if (!id) return;
@@ -65,6 +74,13 @@ export default function InvestigationDossierPage() {
         setInvestigation(data);
         setReviewStatus(data.review_status || 'NEW');
         setReviewNotes(data.review_notes || '');
+
+        try {
+          const fbRes = await fetchInvestigationFeedback(id);
+          setFeedbackHistory(Array.isArray(fbRes) ? fbRes : (fbRes?.feedback || []));
+        } catch (fbErr) {
+          console.warn('Could not load feedback history', fbErr);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -157,6 +173,18 @@ export default function InvestigationDossierPage() {
         </div>
 
         <div className="page-heading-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setFeedbackTargetAttachment('');
+              setFeedbackModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-1.5 border border-input bg-background shadow-sm hover:bg-accent h-8 rounded-md px-3 text-xs font-medium cursor-pointer"
+            title="Report a false positive, false negative, or incorrect file type"
+          >
+            <Flag className="w-3.5 h-3.5 text-warning" />
+            <span>Report Classification</span>
+          </button>
           <a
             href={getExportDownloadUrl(investigation.id, 'json')}
             download
@@ -209,16 +237,43 @@ export default function InvestigationDossierPage() {
 
         <div className="metric-card">
           <div className="metric-label">
-            <span>Email Vector Score</span>
+            <span>Sender &amp; Auth Vector</span>
             <Layers className="w-4 h-4 text-muted-foreground" />
           </div>
           <div className="metric-value">
-            {risk?.email_score || 0}
+            {risk?.sender_score ?? 0}
             <span className="metric-unit">/100</span>
           </div>
           <div className="metric-foot font-mono text-[10px]">
-            <span>SPF: {authResults.spf_result || 'NONE'} | DKIM: {authResults.dkim_result || 'NONE'}</span>
-            <span>DMARC: {authResults.dmarc_result || 'NONE'}</span>
+            <span>SPF: {authResults.spf_result || 'NONE'} | DMARC: {authResults.dmarc_result || 'NONE'}</span>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-label">
+            <span>Body &amp; Text Semantics</span>
+            <FileText className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="metric-value">
+            {risk?.body_score ?? 0}
+            <span className="metric-unit">/100</span>
+          </div>
+          <div className="metric-foot font-mono text-[10px]">
+            <span>Urgency &amp; Credential Solicitation</span>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-label">
+            <span>Hyperlink &amp; URL Vector</span>
+            <LinkIcon className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="metric-value">
+            {risk?.url_score ?? 0}
+            <span className="metric-unit">/100</span>
+          </div>
+          <div className="metric-foot font-mono text-[10px]">
+            <span>{urls.length} link(s) inspected</span>
           </div>
         </div>
 
@@ -228,7 +283,7 @@ export default function InvestigationDossierPage() {
             <Paperclip className="w-4 h-4 text-muted-foreground" />
           </div>
           <div className="metric-value">
-            {risk?.attachment_score || 0}
+            {risk?.attachment_score ?? 0}
             <span className="metric-unit">/100</span>
           </div>
           <div className="metric-foot">
@@ -347,6 +402,15 @@ export default function InvestigationDossierPage() {
       {/* 5. Tab 1: Dossier View */}
       {activeTab === 'dossier' && (
         <div className="space-y-6">
+          {/* 4-Way Threat Vector Risk Breakdown (Mission 03 Deliverable 1) */}
+          <RiskVectorBreakdown
+            risk={risk}
+            evidence={evidence || []}
+            emailMetadata={email_metadata}
+            attachments={attachments}
+            urls={urls}
+          />
+
           {/* AI Synthesis Card */}
           {llm_interpretation && (
             <div className="bg-card border border-border rounded-md p-5 space-y-3">
@@ -466,17 +530,30 @@ export default function InvestigationDossierPage() {
         </div>
       )}
 
-      {/* 6. Tab 2: Attachment Inventory View (Mission #73 Mandatory Requirement) */}
+      {/* 6. Tab 2: Attachment Inventory & Report Cards (Mission 03 Requirement) */}
       {activeTab === 'attachments' && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <span className="eyebrow">STATIC FORENSIC METADATA</span>
-              <h3 className="text-base font-semibold text-foreground">Attachment Inventory</h3>
+              <span className="eyebrow">STATIC FORENSIC METADATA &amp; RISK REPORT CARDS</span>
+              <h3 className="text-base font-semibold text-foreground">Attachment Risk Breakdown</h3>
             </div>
-            <span className="text-xs font-mono text-muted-foreground">
-              {attachments.length} MIME part(s) inspected
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedbackTargetAttachment('');
+                  setFeedbackModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded bg-background hover:bg-accent cursor-pointer transition shadow-sm"
+              >
+                <Flag className="w-3.5 h-3.5 text-warning" />
+                <span>Report Classification Issue</span>
+              </button>
+              <span className="text-xs font-mono text-muted-foreground">
+                {attachments.length} attachment(s) inspected
+              </span>
+            </div>
           </div>
 
           {attachments.length === 0 ? (
@@ -488,76 +565,72 @@ export default function InvestigationDossierPage() {
               </p>
             </div>
           ) : (
-            <div className="table-scroll border border-border rounded-md bg-card overflow-hidden">
-              <table className="workflow-table">
-                <thead>
-                  <tr>
-                    <th>Filename</th>
-                    <th>Declared Content-Type</th>
-                    <th>Detected Type (Magic Bytes)</th>
-                    <th>Size</th>
-                    <th>SHA-256 Hash</th>
-                    <th>Coverage Status</th>
-                    <th>Parsing Limitations / Traits</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attachments.map((att, idx) => {
-                    const isDangerous = att.dangerous_extension || att.rtlo_detected || att.double_extension || att.macro_detected;
-                    const statusClass =
-                      att.coverage_status === 'SCANNED'
-                        ? 'tone-success'
-                        : att.coverage_status === 'UNSCANNED' || att.coverage_status === 'OVERSIZED'
-                        ? 'tone-danger'
-                        : 'tone-warning';
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                {attachments.map((att, idx) => (
+                  <AttachmentReportCard
+                    key={`${att.filename}-${idx}`}
+                    attachment={att}
+                    index={idx}
+                    onReportIssue={(fname) => {
+                      setFeedbackTargetAttachment(fname);
+                      setFeedbackModalOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-                    return (
-                      <tr key={`${att.filename}-${idx}`} className="hover:bg-muted/30 transition">
-                        <td className="align-top py-2.5 font-mono text-xs font-semibold text-foreground">
-                          <div className="flex items-center gap-1.5">
-                            {isDangerous ? (
-                              <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" />
-                            ) : (
-                              <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            )}
-                            <span title={att.filename} className="max-w-[180px] truncate block">
-                              {att.filename}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="align-top py-2.5 font-mono text-[11px] text-muted-foreground">
-                          {att.declared_mime || 'unspecified'}
-                        </td>
-                        <td className="align-top py-2.5 font-mono text-xs text-foreground">
-                          {att.detected_type || 'UNKNOWN'}
-                        </td>
-                        <td className="align-top py-2.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                          {formatBytes(att.size_bytes)}
-                        </td>
-                        <td className="align-top py-2.5 font-mono text-[10px] text-primary">
-                          <span title={att.sha256} className="cursor-help">
-                            {att.sha256 ? `${att.sha256.substring(0, 16)}...` : 'N/A'}
+          {/* User & Analyst Classification Feedback History */}
+          {feedbackHistory.length > 0 && (
+            <div className="border border-border/80 rounded-md bg-card/70 p-4 space-y-3 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flag className="w-4 h-4 text-warning" />
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                    Analyst Classification Feedback &amp; Calibration Log ({feedbackHistory.length})
+                  </h4>
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  Recorded for model evaluation and rule tuning
+                </span>
+              </div>
+              <div className="space-y-2.5">
+                {feedbackHistory.map((fb, idx) => (
+                  <div
+                    key={fb.id || idx}
+                    className="p-3 bg-background border border-border rounded text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-warning/15 text-warning border border-warning/30 font-mono">
+                          {fb.category?.replace(/_/g, ' ') || 'FEEDBACK'}
+                        </span>
+                        {fb.target_attachment && (
+                          <span className="text-[11px] font-mono text-foreground font-semibold flex items-center gap-1">
+                            <Paperclip className="w-3 h-3 text-muted-foreground" />
+                            {fb.target_attachment}
                           </span>
-                        </td>
-                        <td className="align-top py-2.5">
-                          <span className={`status-badge badge-small ${statusClass}`}>
-                            {att.coverage_status}
-                          </span>
-                        </td>
-                        <td className="align-top py-2.5 text-[11px] text-muted-foreground max-w-xs">
-                          {att.limitations || 'Static inspection complete.'}
-                          {att.archive_members?.length > 0 && (
-                            <div className="mt-1 text-[10px] font-mono text-foreground bg-background p-1.5 rounded border border-border">
-                              Archive members: {att.archive_members.slice(0, 3).join(', ')}
-                              {att.archive_members.length > 3 ? ` (+${att.archive_members.length - 3} more)` : ''}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {fb.submitted_at ? new Date(fb.submitted_at).toLocaleString() : 'Recent'}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed">
+                      {fb.explanation}
+                    </p>
+                    {fb.original_prediction_snapshot && (
+                      <div className="text-[10px] font-mono text-muted-foreground pt-1.5 border-t border-border/40 flex items-center gap-3">
+                        <span>Overall Risk: {fb.original_prediction_snapshot.overall_score ?? 'N/A'}/100 ({fb.original_prediction_snapshot.overall_rating ?? 'N/A'})</span>
+                        <span>Evidence Count: {fb.original_prediction_snapshot.evidence_count ?? 0}</span>
+                        <span>Status: <span className="text-success font-semibold">{fb.status || 'RECORDED'}</span></span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </section>
@@ -742,6 +815,18 @@ export default function InvestigationDossierPage() {
           </div>
         </section>
       )}
+
+      {/* 10. Classification Feedback Modal (Mission 03) */}
+      <ClassificationFeedbackModal
+        isOpen={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        investigationId={investigation.id}
+        attachments={attachments}
+        preselectedAttachment={feedbackTargetAttachment}
+        onFeedbackSubmitted={(newFb) => {
+          setFeedbackHistory((prev) => [newFb, ...prev]);
+        }}
+      />
     </div>
   );
 }

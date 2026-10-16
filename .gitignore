@@ -24,3 +24,30 @@ backend/venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Mission 02 Deliverables & Evaluation Artifacts
+PhishGuard_AI_Mission_02_Submission_Report.pdf
+EVALUATION_REPORT.md
+evaluation_results.csv
+screenshots/
+pdf_pages/
+investigation_cases.json
+capture_perfect_screenshots.py
+capture_screenshots.py
+capture_test_summary.py
+generate_pdf_report.py
+run_api_tests.py
+run_corpus_evaluation.py
+verify_scenarios.py
+create_demo_files.py
+demo_files/
+
+# Mission 03 Artifacts & Recordings
+*.mp4
+*.webm
+*.avi
+PhishGuard_AI_Mission_03_Demo.mp4
+create_mission_03_demo_case.py
+rebuild_all_demo_files.py
+record_mission_03_video.py
+VIDEO_RECORDING_SCRIPT.md

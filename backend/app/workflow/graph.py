@@ -338,8 +338,16 @@ def calculate_risk_node(state: InvestigationState) -> Dict[str, Any]:
 
     _record_trace(
         state, node, name, TraceStatusEnum.COMPLETED, t0,
-        f"Calculated overall risk score {risk.overall_score}/100 ({risk.overall_rating.value}). Email: {risk.email_score}, Attachment: {risk.attachment_score}.",
-        {"overall_score": risk.overall_score, "rating": risk.overall_rating.value}
+        f"Calculated overall risk score {risk.overall_score}/100 ({risk.overall_rating.value}). Sender: {risk.sender_score}, Body: {risk.body_score}, URLs: {risk.url_score}, Attachment: {risk.attachment_score}.",
+        {
+            "overall_score": risk.overall_score,
+            "rating": risk.overall_rating.value,
+            "sender_score": risk.sender_score,
+            "body_score": risk.body_score,
+            "url_score": risk.url_score,
+            "attachment_score": risk.attachment_score,
+            "email_score": risk.email_score
+        }
     )
     return {"risk": risk, "trace": state["trace"]}
 

@@ -15,7 +15,8 @@ from app.models.schemas import (
     TraceStep,
     TraceStatusEnum,
     SeverityEnum,
-    ConfidenceEnum
+    ConfidenceEnum,
+    FeedbackRecord
 )
 from app.engine.rule_definitions import RULE_DEFINITIONS
 
@@ -32,6 +33,7 @@ class MemoryStore:
         self._users_by_email: Dict[str, dict] = {}
         self._users_by_id: Dict[str, dict] = {}
         self._audit_events: List[dict] = []
+        self._feedback: List[FeedbackRecord] = []
         self._seed_demo_data()
 
     def add_user(self, user_dict: dict) -> None:
@@ -92,6 +94,18 @@ class MemoryStore:
                     inv.review_notes = notes
                 return inv
             return None
+
+    def add_feedback(self, feedback: FeedbackRecord) -> None:
+        with self._lock:
+            self._feedback.append(feedback)
+
+    def get_feedback_for_investigation(self, inv_id: str) -> List[FeedbackRecord]:
+        with self._lock:
+            return [f for f in self._feedback if f.investigation_id == inv_id]
+
+    def list_all_feedback(self) -> List[FeedbackRecord]:
+        with self._lock:
+            return list(self._feedback)
 
     def _seed_demo_data(self):
         now = datetime.now(timezone.utc)
@@ -220,8 +234,11 @@ class MemoryStore:
             input_type="eml",
             status="COMPLETED",
             risk=ComponentRisk(
-                email_score=95,
+                sender_score=55,
+                body_score=40,
+                url_score=35,
                 attachment_score=0,
+                email_score=95,
                 overall_score=95,
                 overall_rating=RiskRatingEnum.HIGH,
                 contributing_findings=[
@@ -350,8 +367,11 @@ class MemoryStore:
             input_type="eml",
             status="COMPLETED",
             risk=ComponentRisk(
-                email_score=0,
+                sender_score=0,
+                body_score=0,
+                url_score=0,
                 attachment_score=0,
+                email_score=0,
                 overall_score=0,
                 overall_rating=RiskRatingEnum.LOW,
                 contributing_findings=[],

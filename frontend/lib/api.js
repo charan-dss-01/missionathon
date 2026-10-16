@@ -354,3 +354,35 @@ export function getExportDownloadUrl(id, format = 'json') {
   return `${base}/api/investigations/${id}/export?format=${format}`;
 }
 
+export async function submitInvestigationFeedback(invId, feedbackData) {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/investigations/${invId}/feedback`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(feedbackData),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Failed to submit feedback (HTTP ${res.status}).`);
+  }
+  return await res.json();
+}
+
+export async function fetchInvestigationFeedback(invId) {
+  const base = getApiBaseUrl();
+  try {
+    const res = await fetch(`${base}/api/investigations/${invId}/feedback`, {
+      cache: 'no-store',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to fetch investigation feedback:', err);
+    return [];
+  }
+}
+
+
