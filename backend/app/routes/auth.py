@@ -41,6 +41,9 @@ async def register(req: UserRegisterRequest, request: Request, response: Respons
     AuthService.check_rate_limit(client_ip)
 
     if not db_manager.is_connected:
+        await db_manager.ensure_connected()
+
+    if not db_manager.is_connected:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service unavailable. Cannot create account at this time."
@@ -103,6 +106,9 @@ async def login(req: UserLoginRequest, request: Request, response: Response):
     """
     client_ip = request.client.host if request.client else "unknown"
     AuthService.check_rate_limit(client_ip)
+
+    if not db_manager.is_connected:
+        await db_manager.ensure_connected()
 
     if not db_manager.is_connected:
         raise HTTPException(
@@ -179,6 +185,9 @@ async def change_password(
     Allows authenticated users to change their password securely.
     Verifies current password before updating to new bcrypt hash.
     """
+    if not db_manager.is_connected:
+        await db_manager.ensure_connected()
+
     if not db_manager.is_connected:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable.")
 
