@@ -439,3 +439,183 @@ body {
   box-shadow: inset 0 0 0 2px var(--danger);
   transition: background 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* ==========================================================================
+   PhishGuard Control Tower - SOC UI Alignment & Polish
+   ========================================================================== */
+
+.nav-icon-wrap {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-icon-wrap svg {
+  width: 16px;
+  height: 16px;
+}
+
+.nav-item {
+  border-radius: 6px;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+}
+
+.nav-item:hover {
+  background: var(--surface-light);
+  color: var(--foreground);
+}
+
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  background: transparent;
+  cursor: pointer;
+}
+
+.topbar-btn:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+  border-color: var(--border);
+}
+
+.topbar-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  height: 32px;
+  padding: 0 12px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.topbar-auth-btn:hover {
+  background: var(--surface-light);
+  border-color: var(--muted-foreground);
+}
+
+.notification-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 0 2px var(--background);
+}
+
+.top-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--foreground);
+  font-weight: 600;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease;
+}
+
+.top-avatar:hover {
+  border-color: var(--primary);
+}
+
+.workspace-switch {
+  transition: border-color 0.15s ease;
+}
+
+.workspace-switch:hover {
+  border-color: var(--muted-foreground);
+}
+
+.workspace-avatar {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   Brand & Logo Contained Alignment
+   ========================================================================== */
+
+.brand {
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 28px;
+  display: flex;
+  text-decoration: none;
+}
+
+.brand-mark {
+  color: var(--primary);
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  display: grid;
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.brand-copy strong {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  display: flex;
+  align-items: flex-start;
+  color: var(--foreground);
+}
+
+.brand-copy strong span {
+  vertical-align: top;
+  color: var(--muted-foreground);
+  margin-left: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.brand-copy small {
+  color: var(--muted-foreground);
+  letter-spacing: 1.8px;
+  margin-top: 4px;
+  font-size: 8.5px;
+  font-weight: 600;
+  display: block;
+}
+
+.sidebar-collapsed .brand-copy {
+  display: none !important;
+}
+
+.sidebar-collapsed .brand {
+  justify-content: center;
+  padding: 0 0 28px;
+}
+
+
+

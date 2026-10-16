@@ -1,4 +1,4 @@
-"""Ensures zero network access or outbound socket communication during analysis."""
+"""Ensures zero network access or outbound socket communication during static analysis."""
 
 import socket
 import pytest
@@ -8,26 +8,31 @@ import io
 import qrcode
 
 from app.workflow.graph import investigation_graph
-from app.analyzers.qr_analyzer import analyze_qr
 from app.models.schemas import RiskRatingEnum
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-def _blocked_socket(*args, **kwargs):
-    raise RuntimeError("Forbidden outbound network socket creation attempted during static analysis!")
+def _blocked_connect(self, address):
+    raise RuntimeError(f"Forbidden outbound network connection attempted to {address} during static analysis!")
+
+
+def _blocked_dns(*args, **kwargs):
+    raise RuntimeError(f"Forbidden DNS resolution attempted for {args} during static analysis!")
 
 
 @pytest.mark.asyncio
 async def test_zero_network_during_all_corpus_analysis():
     """
-    Patches socket.socket and socket.create_connection to assert that the entire
-    investigation pipeline runs strictly offline with zero remote network calls.
+    Patches socket.socket.connect and socket.getaddrinfo to assert that the entire
+    investigation pipeline executes strictly offline with zero remote DNS lookups
+    or network connections.
     """
     fixture_files = ["benign.eml", "reply_to_mismatch.eml", "auth_failure.eml", "url_mismatch.eml"]
 
-    with patch.object(socket.socket, "connect", side_effect=_blocked_socket), \
-         patch("socket.create_connection", side_effect=_blocked_socket):
+    with patch.object(socket.socket, "connect", _blocked_connect), \
+         patch("socket.create_connection", _blocked_connect), \
+         patch("socket.getaddrinfo", _blocked_dns):
 
         # 1. Analyze every corpus email fixture
         for f_name in fixture_files:

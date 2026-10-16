@@ -35,14 +35,15 @@ class MongoDBManager:
 
         try:
             logger.info(f"Connecting to MongoDB ({'Atlas Cloud' if self._is_atlas else 'Local/Standard'})...")
-            # Create async client with bounded timeouts
+            # Create async client with bounded timeouts and idle socket recycling
             self.client = AsyncIOMotorClient(
                 uri,
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=5000,
                 socketTimeoutMS=10000,
+                maxIdleTimeMS=30000,
                 maxPoolSize=50,
-                minPoolSize=5
+                minPoolSize=0
             )
             self.db = self.client[settings.MONGODB_DATABASE]
 
@@ -72,10 +73,22 @@ class MongoDBManager:
             self._connected = False
             logger.info("MongoDB connection pool closed.")
 
+    async def ensure_connected(self) -> bool:
+        """
+        Verifies connectivity and automatically reconnects if disconnected.
+        """
+        if self._connected and self.client:
+            return True
+        return await self.connect()
+
     async def check_health(self) -> Dict[str, Any]:
         """
-        Executes a real-time health check against the MongoDB instance.
+        Executes a real-time health check against the MongoDB instance,
+        attempting automatic reconnection if a transient disconnect occurred.
         """
+        if not self.client or not self._connected:
+            await self.connect()
+
         if not self.client or not self._connected:
             return {
                 "status": "disconnected",
@@ -88,6 +101,7 @@ class MongoDBManager:
             t0 = time.time()
             ping_result = await self.client.admin.command('ping')
             latency_ms = round((time.time() - t0) * 1000, 2)
+            self._connected = True
             return {
                 "status": "connected",
                 "database": settings.MONGODB_DATABASE,
@@ -96,6 +110,22 @@ class MongoDBManager:
                 "ping": ping_result.get("ok", 1) == 1
             }
         except Exception as e:
+            # Attempt one reconnection if socket dropped
+            logger.warning(f"MongoDB ping failed ({e}), attempting reconnection...")
+            if await self.connect():
+                try:
+                    t0 = time.time()
+                    ping_result = await self.client.admin.command('ping')
+                    latency_ms = round((time.time() - t0) * 1000, 2)
+                    return {
+                        "status": "connected",
+                        "database": settings.MONGODB_DATABASE,
+                        "is_atlas": self._is_atlas,
+                        "latency_ms": latency_ms,
+                        "ping": ping_result.get("ok", 1) == 1
+                    }
+                except Exception:
+                    pass
             self._connected = False
             self._last_error = str(e)
             return {

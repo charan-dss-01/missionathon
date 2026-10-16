@@ -41,6 +41,9 @@ async def register(req: UserRegisterRequest, request: Request, response: Respons
     client_ip = request.client.host if request.client else "unknown"
     AuthService.check_rate_limit(client_ip)
 
+    if not db_manager.is_connected:
+        await db_manager.ensure_connected()
+
     if db_manager.is_connected:
         users_col = db_manager.get_users_col()
         existing_user = await users_col.find_one({"email": req.email})
@@ -104,6 +107,9 @@ async def login(req: UserLoginRequest, request: Request, response: Response):
     """
     client_ip = request.client.host if request.client else "unknown"
     AuthService.check_rate_limit(client_ip)
+
+    if not db_manager.is_connected:
+        await db_manager.ensure_connected()
 
     if db_manager.is_connected:
         users_col = db_manager.get_users_col()
@@ -181,6 +187,9 @@ async def change_password(
     Allows authenticated users to change their password securely.
     Verifies current password before updating to new bcrypt hash.
     """
+    if not db_manager.is_connected:
+        await db_manager.ensure_connected()
+
     if db_manager.is_connected:
         users_col = db_manager.get_users_col()
         user_doc = await users_col.find_one({"id": current_user.id})

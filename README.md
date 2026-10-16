@@ -5,8 +5,9 @@
 [![LangGraph](https://img.shields.io/badge/Workflow-LangGraph-FF6F00)](https://langchain-ai.github.io/langgraph/)
 [![TailwindCSS](https://img.shields.io/badge/Design-TailwindCSS-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/Security-Air--Gapped%20Static-blue)](#security-and-privacy)
+[![Tests](https://img.shields.io/badge/Tests-60%20Passed-brightgreen)](backend/tests)
 
-**PhishGuard AI** is a production-grade 24-hour hackathon MVP built for Tier-2 and Tier-3 Security Operations Center (SOC) analysts. It performs deep, multi-vector static analysis of suspicious email text, `.eml` files, hyperlinks, and attachments. Every finding is backed by transparent, deterministic Python security rules, explainable risk scoring, and multi-tier AI orchestration (Gemini primary, Groq automatic fallback, and deterministic rule-grounded offline templates).
+**PhishGuard AI** is a production-grade 24-hour hackathon MVP built for Tier-2 and Tier-3 Security Operations Center (SOC) analysts. It performs deep, multi-vector static analysis of suspicious email text, `.eml` files, hyperlinks, attachments, and embedded QR codes. Every finding is backed by transparent, deterministic Python security rules, explainable risk scoring, and multi-tier AI orchestration (Gemini primary, Groq automatic fallback, and deterministic rule-grounded offline templates).
 
 ---
 
@@ -24,7 +25,26 @@
 
 ---
 
-## 2. The 10-Node LangGraph Pipeline
+## 2. Advanced Security Capabilities
+
+### Victim View vs. Forensic Truth Mode (`VictimTruthView`)
+- Side-by-side interactive comparison between the recipient's deceptive inbox perspective and verified forensic reality.
+- Identifies display name spoofing, reply-to redirection, lookalike homograph URLs, RTLO Unicode masking, and binary MIME inconsistencies.
+
+### Visual Attack Story Timeline (`AttackTimeline`)
+- Maps observed evidence chronologically across the 4 canonical ATT&CK progression stages: **Lure** $\rightarrow$ **Deception** $\rightarrow$ **Delivery** $\rightarrow$ **Action**.
+- Correlates findings to MITRE ATT&CK techniques (`T1036`, `T1204`, `T1566`, `T1566.001`, `T1566.002`, `T1027`).
+- Interactive rule chips smoothly scroll and highlight matching records directly in the Authoritative Evidence Table.
+
+### In-Memory QR Code & Quishing Detection (`qr_analyzer`)
+- Detects 2D barcodes in image attachments (`PNG`, `JPEG`, `GIF` verified strictly by magic bytes).
+- Strict in-memory safety limits: Max 5 MB per image, max $4000\times 4000\text{ px}$ parsed from headers **before** decoding, and a cap of 3 images per email.
+- Decoded URLs are routed through `URLAnalyzer` without making remote network calls; user-facing URLs are strictly defanged (`hxxps://`, `[.]`).
+- New authoritative rules: `ATT_QR_PRESENT` (Low, 10 pts) and `ATT_QR_URL_FLAGGED` (High, 30 pts).
+
+---
+
+## 3. The 10-Node LangGraph Pipeline
 
 The investigation lifecycle executes across 10 explicit LangGraph nodes:
 
@@ -44,7 +64,7 @@ The investigation lifecycle executes across 10 explicit LangGraph nodes:
 4. analyze_urls          ──► Static syntactic analysis: IP literals, punycode, homoglyphs, deceptive subdomains
    │
    ▼
-5. analyze_attachments   ──► Safe byte inspection: magic signatures, RTLO (\u202e), double exts, macros, active scripts
+5. analyze_attachments   ──► Safe byte inspection: magic signatures, RTLO, double exts, macros, QR codes
    │
    ▼
 6. aggregate_evidence    ──► Deduplicates correlated findings and compiles authoritative records
@@ -67,15 +87,13 @@ The investigation lifecycle executes across 10 explicit LangGraph nodes:
 
 ---
 
----
-
-## 3. Product Pages & Control Tower Views
+## 4. Product Pages & Control Tower Views
 
 | Page | Route | Description |
 | :--- | :--- | :--- |
 | **1. Overview Dashboard** | `/` | Real-time session telemetry, threat counters, MongoDB Atlas connection status, provider status pills, and recent investigation feed. |
-| **2. New Investigation** | `/investigate` | Multi-vector intake supporting pasted plain text, `.eml` uploads, URL static scan, attachment upload, and 1-click synthetic test fixtures. Includes fallback simulation toggles. |
-| **3. Investigation Results** | `/investigations/[id]` | Full investigation dossier: risk gauges, email vs attachment breakdown, AI synthesis, evidence table, header telemetry, and export buttons. |
+| **2. New Investigation** | `/investigate` | Multi-vector intake supporting plain text, `.eml` uploads, URL static scan, attachment upload, and 1-click synthetic test fixtures. |
+| **3. Investigation Results** | `/investigations/[id]` | Full dossier: risk gauges, email vs attachment breakdown, Victim vs Truth view, Attack Story Timeline, AI synthesis, and export tools. |
 | **4. Agent Orchestration** | `/trace` | Connected LangGraph DAG timeline with node execution states, duration in milliseconds, logs, and payload inspectors. |
 | **5. Investigation History** | `/history` | Full searchable and filterable session audit log with instant export downloads, filtered strictly to the authenticated tenant. |
 | **6. Human Review Queue** | `/queue` | Master-detail SOC triage board with status transitions (`NEW`, `IN_REVIEW`, `RESOLVED_MALICIOUS`, `RESOLVED_BENIGN`) and analyst notes. |
@@ -86,75 +104,27 @@ The investigation lifecycle executes across 10 explicit LangGraph nodes:
 
 ---
 
-## 4. MongoDB Database & User Authentication Architecture
+## 5. API Endpoints Reference
 
-PhishGuard AI features an enterprise multi-tenant MongoDB layer with strict tenant isolation:
+### Authentication (`/api/auth`)
+- `POST /api/auth/register` — Register a new analyst account (`email`, `password`, `full_name`).
+- `POST /api/auth/login` — Authenticate and receive signed HS256 JWT in secure HTTP-only cookie.
+- `POST /api/auth/logout` — Terminate session and invalidate auth cookie.
+- `GET /api/auth/me` — Retrieve authenticated user profile and roles.
+- `POST /api/auth/change-password` — Securely update analyst credentials.
 
-1. **Async Motor Driver:** Native non-blocking async I/O fully integrated into FastAPI's lifespan lifecycle.
-2. **Atlas & Local Support:** Seamlessly connects to MongoDB Atlas clusters via `mongodb+srv://` or local MongoDB instances.
-3. **Database Collections & Indexes:**
-   - `users`: Unique index on normalized `email`. Stores user ID, name, bcrypt password hash (cost factor 12), role (`user`/`admin`), and login timestamps.
-   - `investigations`: Unique index on `id`, compound index on `(owner_id, created_at)`.
-   - `audit_events`: Indexed by `created_at` and `user_id`. Tracks `REGISTER_SUCCESS`, `LOGIN_SUCCESS`, `LOGIN_FAILED`, `PASSWORD_CHANGE`, and `LOGOUT`.
-4. **Multi-Tenant Isolation:** Every investigation is tagged with `owner_id`. Backend endpoints (`GET /api/investigations/{id}`, `/trace`, `/review`, `/export`) enforce ownership and strictly return `403 Forbidden` if an unauthorized user attempts access.
-5. **Session Security:** Issues signed HS256 JWT tokens transmitted via secure HTTP-only cookies (`phishguard_session`) with `SameSite=Lax` and optional `Authorization: Bearer` fallback. Passwords are never stored in plaintext and never returned in API payloads.
-
----
-
-## 5. Visual Design Direction
-
-Inspired by high-performance cyber command centers (Obsidian `#080B10`, Layered Panels `#101720`, Cyan Highlights `#4DEBFF`, Acid-Lime Accents `#C7FF5E`, and Alert Crimson `#FF5364`). Features subtle borders, restrained glass effects, and accessible responsive layouts.
-
----
-
-## 6. Quickstart & Installation
-
-### Prerequisites
-- Python 3.11+
-- Node.js 18+ and npm
-- MongoDB Atlas cluster URI OR local MongoDB instance running on `127.0.0.1:27017`
-
-### 1. Backend Setup
-```bash
-cd backend
-
-# Create and activate virtual environment
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy environment template and fill in keys
-cp .env.example .env
-
-# Run automated test suite (33 tests)
-pytest -v
-
-# Start FastAPI backend (port 8000)
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### 2. Frontend Setup
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run production build or development server
-npm run build
-npm run dev -- -p 3001
-```
-
-Visit `http://localhost:3001` (or `http://localhost:3000`) in your browser.
+### Investigations (`/api`)
+- `POST /api/analyze` — Intake raw text, `.eml`, URL, or attachment for full pipeline processing.
+- `GET /api/investigations` — Retrieve paginated investigations scoped to the authenticated tenant.
+- `GET /api/investigations/{id}` — Fetch complete investigation dossier and findings.
+- `PATCH /api/investigations/{id}/review` — Commit human triage status and review notes.
+- `GET /api/investigations/{id}/export/{format}` — Download investigation in Markdown, CSV, or JSON format.
+- `GET /api/health` — Service readiness, MongoDB latency, and version check.
+- `GET /api/providers/status` — Live health check for Gemini, Groq, and fallback pipelines.
 
 ---
 
-## 7. Environment Variables Reference
+## 6. Environment Variables Reference
 
 ### Backend (`backend/.env`)
 ```ini
@@ -165,16 +135,20 @@ GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=openai/gpt-oss-120b
 PRIMARY_LLM_PROVIDER=gemini
 
-# MongoDB Atlas / Local Database
-MONGODB_URI=mongodb://127.0.0.1:27017
+# Feature Flags
+FEATURE_INSIGHTS=true    # Enables Victim vs Truth view, Clues, and Attack Story Timeline
+FEATURE_QR=true          # Enables in-memory QR barcode analysis on image attachments
+
+# MongoDB Database (Atlas or Local)
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/?retryWrites=true&w=majority
 MONGODB_DATABASE=phishguard_ai
 
 # JWT Authentication & Cookie Security
-JWT_SECRET=replace-with-a-very-strong-random-secret-key-at-least-32-chars
+JWT_SECRET=phishguard-ai-soc-platform-super-secure-jwt-key-32-chars-min
 JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
 COOKIE_NAME=phishguard_session
-COOKIE_SECURE=false
+COOKIE_SECURE=false      # Set to true in production with HTTPS
 COOKIE_SAMESITE=lax
 
 # Server Configuration
@@ -182,13 +156,9 @@ BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001
 MAX_UPLOAD_BYTES=10485760
+MAX_ATTACHMENT_SIZE_BYTES=5242880
 REQUEST_TIMEOUT_SECONDS=30
 ```
-
-*Note: If no LLM keys are configured, PhishGuard automatically falls back to deterministic rule scoring and template synthesis without downtime.*
-
-
-*Note: If no API keys are provided, PhishGuard automatically executes the deterministic rule engine and rule-grounded template synthesis without failing!*
 
 ### Frontend (`frontend/.env.local`)
 ```ini
@@ -199,48 +169,55 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ## 7. Running Tests & Verifying Fixtures
 
-The backend includes 30 automated test cases covering analyzers, risk math, failover logic, evidence validation, and realistic synthetic fixtures:
+The backend includes **60 automated test cases** (100% passing) verifying all analyzers, risk scoring, failover, evidence validation, and network isolation:
 
 ```bash
 cd backend
 venv\Scripts\pytest -v
 ```
 
-Test categories:
-- `test_analyzers.py`: Validates header, body, URL, and attachment rules (RTLO, double extension, magic bytes, macro detection).
-- `test_risk_engine.py`: Tests deterministic weights, component score calculation, and coverage flags.
-- `test_fallback.py`: Tests sensitive data redaction, Groq failover, and offline rule fallback.
-- `test_validator.py`: Verifies rejection of hallucinated claims.
-- `test_fixtures.py`: Validates synthetic `.eml` and attachment fixtures end-to-end.
-- `test_api.py`: Validates REST API endpoints (`/api/health`, `/api/providers/status`, `/api/analyze`, exports).
+### Test Suite Structure
+- `test_no_network.py` (1 test): Patches socket connections and DNS resolution to confirm zero network access across all corpus fixtures.
+- `test_fixtures.py` (8 tests): Validates baseline snapshot scoring invariants and realistic email/attachment fixtures.
+- `test_qr.py` (7 tests): Validates QR detection, flagged typosquat URLs, benign URLs, oversized images, missing library fallbacks, and graph integration.
+- `test_insights.py` (5 tests): Validates Victim vs Truth deceptions, clue locator spans, and attack timeline assembly.
+- `test_defang.py` (7 tests): Tests URL defanging idempotence across IP literals, userinfo, subdomains, and protocols.
+- `test_rule_metadata.py` (6 tests): Validates presentation descriptions, hints, stages, and MITRE ATT&CK coverage.
+- `test_analyzers.py` (12 tests): Unit tests for header, body, URL, and attachment rules.
+- `test_auth.py` (3 tests): Tests registration, login, JWT validation, and multi-tenant data isolation.
+- `test_risk_engine.py` (3 tests): Validates deterministic weights, component score bounds, and coverage flags.
+- `test_fallback.py` (3 tests): Tests sensitive data redaction, Groq failover, and offline rule-grounded fallback.
+- `test_validator.py` (2 tests): Verifies rejection of hallucinated LLM claims.
+- `test_api.py` (4 tests): Tests REST API endpoints, review triage updates, and health endpoints.
 
 ---
 
-## 8. Demo Walkthrough for Evaluators
+## 8. Limitations & Scope of Analysis
 
-1. **Dashboard (`/`):** View live metrics, active provider telemetry, and seeded demo investigations.
-2. **Run New Scan (`/investigate`):**
-   - Click one of the **Synthetic Test Fixtures** (e.g. *Phishing: M365 Credential Theft*).
-   - Check the **"Simulate Gemini 429 / Failover to Groq"** checkbox to observe automatic failover.
-   - Click **Run Investigation**.
-3. **Inspect Dossier (`/investigations/[id]`):**
-   - Review overall risk score (e.g. 95/100 HIGH).
-   - Review component attack vectors (Email vs. Attachment).
-   - Read the AI synthesis with validated evidence IDs and actionable SOC recommendations.
-   - Explore the **Authoritative Evidence Table** detailing rule IDs and exact text observations.
-   - Switch to the **LangGraph Execution Trace** tab to view actual execution durations for each node.
-4. **Human Review Queue (`/queue`):**
-   - Triage cases between `NEW`, `IN_REVIEW`, `RESOLVED_MALICIOUS`, and `RESOLVED_BENIGN`.
-   - Add analyst case notes and click **Commit Triage Decision**.
-5. **Export (`/reports`):**
-   - Download the investigation dossier in **Markdown**, **CSV**, or **JSON** format.
+- **Static Inspection Only:** PhishGuard AI does not detonate files or run sandboxed dynamic execution. Executable files are evaluated purely via magic bytes, RTLO markers, double extensions, and structure.
+- **Air-Gapped URL Evaluation:** URLs are inspected syntactically and defanged. PhishGuard does not execute HTTP requests, follow redirects, or render JavaScript on remote landing pages.
+- **Encrypted & Protected Archives:** Password-protected archives (`.zip`, `.rar`, `.7z`) and encrypted PDFs cannot be inspected without keys and are marked as `UNSUPPORTED` / `UNSCANNED`.
+- **QR Code Boundaries:** QR detection processes images up to $4000\times 4000\text{ px}$ in memory. Heavily degraded, obstructed, or proprietary 3D codes may require manual SOC review.
+- **Analyst-in-the-Loop:** Risk scores and AI syntheses provide decision support; final quarantine and disposition actions remain in human analyst control via `/queue`.
 
 ---
 
-## 9. Security & Privacy Guarantees
+## 9. Quickstart Guide
 
-- **No Remote Navigation:** URLs are analyzed syntactically without DNS resolution or HTTP requests.
-- **Zero Execution:** File attachments are analyzed purely through bounded magic bytes and central directory tables.
-- **PII Redaction:** Credit card numbers, bearer tokens, passwords, and SSNs are stripped before external LLM transmission.
-- **No Persistence of Secrets:** API keys are server-side only and never transmitted to the browser.
-- **Bounded Resource Limits:** Uploads are strictly capped at 10 MB (5 MB per attachment) to protect against memory exhaustion attacks.
+### 1. Start the Backend
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate       # On Linux/macOS: source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+### 2. Start the Frontend
+```bash
+cd frontend
+npm install
+npm run dev -- -p 3001
+```
+
+Visit **`http://localhost:3001`** in your browser. Default demo cases and test fixtures are pre-seeded and ready for immediate evaluation.
