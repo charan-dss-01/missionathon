@@ -48,32 +48,32 @@ const waveVertexShader = `
   // - Broad sweeping shoulder along the left flank
   // - Subtle saddle in the center behind the typography
   float getDisplacement(vec2 p, float t, vec2 mouse) {
-    vec2 coord = p * 0.24;
-    coord += mouse * 0.06;
+    vec2 coord = p * 0.22;
+    coord += mouse * 0.08;
 
     // Organic domain warping for soft fluid folds
     vec2 warp1 = vec2(
-      snoise(coord * 0.85 + vec2(t * 0.038, t * 0.025)),
-      snoise(coord * 0.75 - vec2(t * 0.032, -t * 0.021))
+      snoise(coord * 0.85 + vec2(t * 0.18, t * 0.12)),
+      snoise(coord * 0.75 - vec2(t * 0.15, -t * 0.10))
     );
 
     vec2 warp2 = vec2(
-      snoise(coord * 1.1 + 0.7 * warp1 + vec2(2.8, 6.4) + t * 0.028),
-      snoise(coord * 0.9 + 0.65 * warp1 + vec2(5.5, 2.1) - t * 0.022)
+      snoise(coord * 1.1 + 0.7 * warp1 + vec2(2.8, 6.4) + t * 0.14),
+      snoise(coord * 0.9 + 0.65 * warp1 + vec2(5.5, 2.1) - t * 0.11)
     );
 
     // 1. Right Crest: Voluptuous rounded formation arching towards upper-right
-    float rightCrest = exp(-pow((p.x - 2.6 + warp2.x * 0.5) * 0.52, 2.0) - pow((p.y - 0.75 + warp2.y * 0.4) * 0.7, 2.0)) * 2.65;
+    float rightCrest = exp(-pow((p.x - 2.5 + warp2.x * 0.6) * 0.50, 2.0) - pow((p.y - 0.70 + warp2.y * 0.5) * 0.65, 2.0)) * 2.85;
 
     // 2. Left Bank: Rolling shoulder across left flank
-    float leftBank = exp(-pow((p.x + 2.8 + warp2.y * 0.45) * 0.46, 2.0) - pow((p.y - 0.25 + warp2.x * 0.35) * 0.65, 2.0)) * 2.15;
+    float leftBank = exp(-pow((p.x + 2.7 + warp2.y * 0.55) * 0.44, 2.0) - pow((p.y - 0.20 + warp2.x * 0.45) * 0.60, 2.0)) * 2.35;
 
     // 3. Central Basin: Negative space for typography
-    float centerValley = -exp(-pow(p.x * 0.65, 2.0) - pow(p.y * 0.75, 2.0)) * 0.65;
+    float centerValley = -exp(-pow(p.x * 0.60, 2.0) - pow(p.y * 0.70, 2.0)) * 0.65;
 
     // 4. Undulating flowing waves connecting them into a continuous ribbon
-    float wave1 = sin(coord.x * 1.15 + coord.y * 0.6 + t * 0.095 + warp1.x * 0.6) * 0.45;
-    float wave2 = cos(coord.x * 0.8 - coord.y * 1.1 + t * 0.075 + warp1.y * 0.5) * 0.35;
+    float wave1 = sin(coord.x * 1.15 + coord.y * 0.65 + t * 0.45 + warp1.x * 0.75) * 0.60;
+    float wave2 = cos(coord.x * 0.85 - coord.y * 1.15 + t * 0.35 + warp1.y * 0.65) * 0.50;
 
     return rightCrest + leftBank + centerValley + wave1 + wave2;
   }
@@ -85,22 +85,22 @@ const waveVertexShader = `
     float t = uTime;
 
     // S-curve spine: Ribbon center follows a diagonal curve across the viewport
-    float spineY = sin(pos.x * 0.42 + 0.35) * 0.85 + 0.25;
+    float spineY = sin(pos.x * 0.38 + 0.35) * 0.90 + 0.30;
     float distFromSpine = abs(pos.y - spineY);
     
     // Ribbon envelope mask: Isolates the wave into a floating organic ribbon
-    float ribbonMask = exp(-pow(distFromSpine * 0.58, 2.2));
+    float ribbonMask = exp(-pow(distFromSpine * 0.42, 2.0));
     vRibbonMask = ribbonMask;
 
     // Displace z based on wave elevation attenuated by ribbon envelope
-    float disp = getDisplacement(pos.xy, t, uMouse) * (0.4 + 0.6 * ribbonMask);
+    float disp = getDisplacement(pos.xy, t, uMouse) * (0.35 + 0.65 * ribbonMask);
     pos.z += disp;
     vElevation = disp;
 
     // Finite difference normal
     float eps = 0.035;
-    float dispX = getDisplacement(pos.xy + vec2(eps, 0.0), t, uMouse) * (0.4 + 0.6 * ribbonMask);
-    float dispY = getDisplacement(pos.xy + vec2(0.0, eps), t, uMouse) * (0.4 + 0.6 * ribbonMask);
+    float dispX = getDisplacement(pos.xy + vec2(eps, 0.0), t, uMouse) * (0.35 + 0.65 * ribbonMask);
+    float dispY = getDisplacement(pos.xy + vec2(0.0, eps), t, uMouse) * (0.35 + 0.65 * ribbonMask);
 
     vec3 tangentX = normalize(vec3(eps, 0.0, dispX - disp));
     vec3 tangentY = normalize(vec3(0.0, eps, dispY - disp));
@@ -114,7 +114,7 @@ const waveVertexShader = `
   }
 `;
 
-// Fragment Shader with Light Green Studio Shading and Stochastic Edge Stipples
+// Fragment Shader with Studio Shading and Stochastic Edge Stipples
 const waveFragmentShader = `
   uniform float uTime;
   uniform vec2 uResolution;
@@ -136,55 +136,55 @@ const waveFragmentShader = `
     vec3 viewDir = normalize(vViewPosition);
 
     // Studio directional lighting
-    vec3 keyLight = normalize(vec3(0.55, 0.72, 0.5));
-    float diff1 = pow(max(dot(normal, keyLight) * 0.5 + 0.5, 0.0), 1.45);
+    vec3 keyLight = normalize(vec3(0.65, 0.85, 0.6));
+    float diff1 = pow(max(dot(normal, keyLight) * 0.5 + 0.5, 0.0), 1.6);
 
-    vec3 fillLight = normalize(vec3(-0.52, -0.22, 0.42));
-    float diff2 = pow(max(dot(normal, fillLight) * 0.5 + 0.5, 0.0), 1.25) * 0.35;
+    vec3 fillLight = normalize(vec3(-0.6, -0.3, 0.4));
+    float diff2 = pow(max(dot(normal, fillLight) * 0.5 + 0.5, 0.0), 1.2) * 0.35;
 
-    // Soft specular sheen
+    // Crisp specular sheen
     vec3 halfDir = normalize(keyLight + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 20.0) * 0.14;
+    float spec = pow(max(dot(normal, halfDir), 0.0), 22.0) * 0.30;
 
     float light = clamp(diff1 + diff2, 0.0, 1.0);
 
     // Soft ambient occlusion in deep valleys
     float ao = smoothstep(-1.2, 1.8, vElevation);
-    ao = mix(0.72, 1.0, ao);
+    ao = mix(0.60, 1.0, ao);
 
-    // White and Light-Gray Monochromatic Palette:
-    // Deepest valley shadow: soft light-gray sculptural shadow (vec3(0.72, 0.75, 0.79))
-    // Midtones: luminous soft off-white/light-gray silk (vec3(0.92, 0.94, 0.96))
-    // Crest highlights: crisp brilliant white (vec3(1.0, 1.0, 1.0))
-    vec3 shadowCol = vec3(0.72, 0.75, 0.79);
-    vec3 midCol    = vec3(0.92, 0.94, 0.96);
+    // Monochromatic High-Definition Sculpted Palette:
+    // Rich studio slate shadows give distinct depth and contrast:
+    vec3 shadowCol = vec3(0.48, 0.52, 0.58);
+    // Smooth silver-pearl midtones:
+    vec3 midCol    = vec3(0.86, 0.89, 0.93);
+    // Brilliant crisp white crest highlights:
     vec3 lightCol  = vec3(1.0, 1.0, 1.0);
 
     float lightSum = light * ao;
-    vec3 surfaceColor = mix(shadowCol, midCol, smoothstep(0.12, 0.65, lightSum));
-    surfaceColor = mix(surfaceColor, lightCol, smoothstep(0.65, 1.0, lightSum) + spec);
+    vec3 surfaceColor = mix(shadowCol, midCol, smoothstep(0.10, 0.62, lightSum));
+    surfaceColor = mix(surfaceColor, lightCol, smoothstep(0.62, 1.0, lightSum) + spec);
 
     // Micro-grain dither
     vec2 screenCoord = gl_FragCoord.xy;
-    float grain = (hash(screenCoord * 0.85 + uTime * 0.02) - 0.5) * 0.035;
+    float grain = (hash(screenCoord * 0.85 + uTime * 0.05) - 0.5) * 0.035;
     surfaceColor += vec3(grain);
 
     // Edge Falloff:
-    float edgeFadeY = smoothstep(0.04, 0.32, vUv.y) * smoothstep(0.98, 0.78, vUv.y);
-    float edgeFadeX = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
+    float edgeFadeY = smoothstep(0.02, 0.25, vUv.y) * smoothstep(0.98, 0.75, vUv.y);
+    float edgeFadeX = smoothstep(0.0, 0.10, vUv.x) * smoothstep(1.0, 0.90, vUv.x);
     float envelope = vRibbonMask * edgeFadeY * edgeFadeX;
 
     // Stochastic Stipple Edge Dissolution
     float stippleThreshold = hash(screenCoord * 1.25);
-    if (envelope < 0.28 && stippleThreshold > envelope / 0.28) {
+    if (envelope < 0.22 && stippleThreshold > envelope / 0.22) {
       discard;
     }
 
-    float finalAlpha = smoothstep(0.0, 0.35, envelope);
+    float finalAlpha = smoothstep(0.0, 0.25, envelope);
 
     // Seamless blend with canvas #f8fafc
     vec3 bgCanvasCol = vec3(0.973, 0.980, 0.988); // #f8fafc
-    vec3 finalColor = mix(bgCanvasCol, surfaceColor, finalAlpha * 0.94);
+    vec3 finalColor = mix(bgCanvasCol, surfaceColor, finalAlpha * 0.96);
 
     gl_FragColor = vec4(finalColor, 1.0);
   }
@@ -200,21 +200,25 @@ const dustVertexShader = `
 
   void main() {
     vec3 pos = position;
-    float t = uTime * 0.14;
+    float t = uTime * 0.40;
 
     // Smooth 3D curl drifting around the crest
-    pos.x += sin(t * 0.8 + aSeed * 6.28) * 0.45;
-    pos.y += cos(t * 0.9 + aSeed * 4.15) * 0.4;
-    pos.z += sin(t * 0.6 + aSeed * 8.31) * 0.5;
+    pos.x += sin(t * 0.8 + aSeed * 6.28) * 0.55;
+    pos.y += cos(t * 0.9 + aSeed * 4.15) * 0.50;
+    pos.z += sin(t * 0.6 + aSeed * 8.31) * 0.60;
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    gl_PointSize = aSize * (1.0 / -mvPosition.z) * 16.0 * (uDpr * 0.85);
-    gl_PointSize = clamp(gl_PointSize, 1.2, 5.5);
+    gl_PointSize = aSize * (1.0 / -mvPosition.z) * 14.0 * (uDpr * 0.85);
+    gl_PointSize = clamp(gl_PointSize, 1.0, 3.8);
+
+    // Soft clearance in central text area so typography stays pristine
+    float centerDist = length(pos.xy * vec2(0.60, 1.05));
+    float textClearance = smoothstep(0.35, 1.8, centerDist);
 
     // Subtle breathing alpha
-    vAlpha = 0.35 + 0.35 * sin(uTime * 0.6 + aSeed * 10.0);
+    vAlpha = (0.28 + 0.32 * sin(uTime * 0.8 + aSeed * 10.0)) * textClearance;
   }
 `;
 
@@ -225,8 +229,8 @@ const dustFragmentShader = `
     float d = length(coord);
     if (d > 0.5) discard;
     float a = smoothstep(0.5, 0.15, d) * vAlpha;
-    // Subtle monochromatic charcoal/graphite dust grains matching reference recording
-    gl_FragColor = vec4(0.35, 0.38, 0.42, a * 0.45);
+    // Delicate stippled graphite grains matching reference recording
+    gl_FragColor = vec4(0.32, 0.35, 0.40, a * 0.60);
   }
 `;
 
@@ -387,7 +391,7 @@ export default function LiquidShaderBackground({ className = '' }) {
       const delta = clock.getDelta();
 
       if (!reducedMotion) {
-        uniforms.uTime.value += delta * 0.45;
+        uniforms.uTime.value += delta * 0.95;
       }
 
       currentMouse.x += (targetMouse.x - currentMouse.x) * 0.045;
