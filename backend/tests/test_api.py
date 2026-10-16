@@ -176,4 +176,3 @@ def test_api_analyze_stream_with_attachment(client):
     att_event = next(e[1] for e in events if e[0] == "node_completed" and e[1]["node"] == "analyze_attachments")
     assert att_event["status"] == "COMPLETED"
     assert att_event["finding_count"] >= 1
-

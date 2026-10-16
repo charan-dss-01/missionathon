@@ -265,7 +265,7 @@ class AttachmentAnalyzer:
                     mismatch_reasons.append(f"extension '{outer_ext}' is not standard for declared MIME '{norm_mime}'")
                 if matching_exts and not any(e in matching_exts for e in expected_exts):
                     mismatch_reasons.append(f"binary signature '{detected_type}' does not correspond to '{norm_mime}'")
-                
+
                 if mismatch_reasons:
                     matched_rules.append("ATT_MIME_DECLARED_MISMATCH")
                     rule = RULE_DEFINITIONS["ATT_MIME_DECLARED_MISMATCH"]
