@@ -44,8 +44,7 @@ const waveVertexShader = `
   }
 
   // Wave elevation matching reference video frames:
-  // Sweeping undulating S-curve:
-  // - High bulbous crest arching across upper-right with deep soft shadow underneath
+  // - High bulbous crest arching across upper-right with soft shadow underneath
   // - Broad sweeping shoulder along the left flank
   // - Subtle saddle in the center behind the typography
   float getDisplacement(vec2 p, float t, vec2 mouse) {
@@ -90,7 +89,6 @@ const waveVertexShader = `
     float distFromSpine = abs(pos.y - spineY);
     
     // Ribbon envelope mask: Isolates the wave into a floating organic ribbon
-    // Leaves pure clean white space at top, bottom, and edges
     float ribbonMask = exp(-pow(distFromSpine * 0.58, 2.2));
     vRibbonMask = ribbonMask;
 
@@ -116,7 +114,7 @@ const waveVertexShader = `
   }
 `;
 
-// Fragment Shader with Monochromatic Studio Shading and Stochastic Edge Stipples
+// Fragment Shader with Light Green Studio Shading and Stochastic Edge Stipples
 const waveFragmentShader = `
   uniform float uTime;
   uniform vec2 uResolution;
@@ -137,18 +135,16 @@ const waveFragmentShader = `
     vec3 normal = normalize(vNormal);
     vec3 viewDir = normalize(vViewPosition);
 
-    // Studio directional lighting:
-    // Key Light from upper right (creates bright porcelain highlights on crests)
+    // Studio directional lighting
     vec3 keyLight = normalize(vec3(0.55, 0.72, 0.5));
     float diff1 = pow(max(dot(normal, keyLight) * 0.5 + 0.5, 0.0), 1.45);
 
-    // Fill Light from opposite angle (soft ambient fill in shadow crevices)
     vec3 fillLight = normalize(vec3(-0.52, -0.22, 0.42));
     float diff2 = pow(max(dot(normal, fillLight) * 0.5 + 0.5, 0.0), 1.25) * 0.35;
 
     // Soft specular sheen
     vec3 halfDir = normalize(keyLight + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 20.0) * 0.12;
+    float spec = pow(max(dot(normal, halfDir), 0.0), 20.0) * 0.14;
 
     float light = clamp(diff1 + diff2, 0.0, 1.0);
 
@@ -156,40 +152,39 @@ const waveFragmentShader = `
     float ao = smoothstep(-1.2, 1.8, vElevation);
     ao = mix(0.72, 1.0, ao);
 
-    // Refined Monochromatic Palette matching reference:
-    // Deepest valley shadow: #505562 to #6c7280 (soft graphite)
-    // Body midtones: #d6d9e0 to #eceef2 (luminous pearl)
-    // Crest highlights: #ffffff (pure studio white)
-    vec3 shadowCol = vec3(0.44, 0.47, 0.53);
-    vec3 midCol    = vec3(0.86, 0.88, 0.91);
-    vec3 lightCol  = vec3(1.0, 1.0, 1.0);
+    // Refined Light Green Cyber Palette:
+    // Deepest valley shadow: rich deep moss/forest green #144230 (vec3(0.08, 0.26, 0.19))
+    // Midtones: luminous soft mint / seafoam green #86efac to #bbf7d0 (vec3(0.55, 0.92, 0.72))
+    // Crest highlights: crisp white with delicate emerald sheen #f4fdf8 (vec3(0.96, 1.0, 0.98))
+    vec3 shadowCol = vec3(0.10, 0.28, 0.20);
+    vec3 midCol    = vec3(0.65, 0.94, 0.78);
+    vec3 lightCol  = vec3(0.98, 1.0, 0.99);
 
     float lightSum = light * ao;
     vec3 surfaceColor = mix(shadowCol, midCol, smoothstep(0.12, 0.65, lightSum));
     surfaceColor = mix(surfaceColor, lightCol, smoothstep(0.65, 1.0, lightSum) + spec);
 
-    // Micro-grain dither for silky sand/matte texture
+    // Micro-grain dither
     vec2 screenCoord = gl_FragCoord.xy;
-    float grain = (hash(screenCoord * 0.85 + uTime * 0.02) - 0.5) * 0.045;
+    float grain = (hash(screenCoord * 0.85 + uTime * 0.02) - 0.5) * 0.04;
     surfaceColor += vec3(grain);
 
     // Edge Falloff:
-    // Blends smoothly into the pure white background
     float edgeFadeY = smoothstep(0.04, 0.32, vUv.y) * smoothstep(0.98, 0.78, vUv.y);
     float edgeFadeX = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
     float envelope = vRibbonMask * edgeFadeY * edgeFadeX;
 
-    // Stochastic Stipple Edge Dissolution:
-    // Where the ribbon fades at the boundary, fine particles disperse into pure white!
+    // Stochastic Stipple Edge Dissolution
     float stippleThreshold = hash(screenCoord * 1.25);
     if (envelope < 0.28 && stippleThreshold > envelope / 0.28) {
-      discard; // Disperses into individual stippled grains matching reference!
+      discard;
     }
 
     float finalAlpha = smoothstep(0.0, 0.35, envelope);
 
-    // Seamless blend with pure white canvas
-    vec3 finalColor = mix(vec3(1.0, 1.0, 1.0), surfaceColor, finalAlpha * 0.92);
+    // Seamless blend with light green canvas #f0fdf4
+    vec3 bgCanvasCol = vec3(0.941, 0.992, 0.957); // #f0fdf4
+    vec3 finalColor = mix(bgCanvasCol, surfaceColor, finalAlpha * 0.94);
 
     gl_FragColor = vec4(finalColor, 1.0);
   }
@@ -219,7 +214,7 @@ const dustVertexShader = `
     gl_PointSize = clamp(gl_PointSize, 1.2, 5.5);
 
     // Subtle breathing alpha
-    vAlpha = 0.3 + 0.35 * sin(uTime * 0.6 + aSeed * 10.0);
+    vAlpha = 0.35 + 0.35 * sin(uTime * 0.6 + aSeed * 10.0);
   }
 `;
 
@@ -230,8 +225,8 @@ const dustFragmentShader = `
     float d = length(coord);
     if (d > 0.5) discard;
     float a = smoothstep(0.5, 0.15, d) * vAlpha;
-    // Charcoal stippled grain
-    gl_FragColor = vec4(0.42, 0.45, 0.50, a * 0.6);
+    // Glowing emerald / mint stippled grain
+    gl_FragColor = vec4(0.12, 0.62, 0.38, a * 0.7);
   }
 `;
 
@@ -271,7 +266,7 @@ export default function LiquidShaderBackground({ className = '' }) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     renderer.setPixelRatio(dpr);
     renderer.setSize(width, height);
-    renderer.setClearColor(0xffffff, 1.0);
+    renderer.setClearColor(0xf0fdf4, 1.0); // Soft light green #f0fdf4
     renderer.domElement.style.position = 'absolute';
     renderer.domElement.style.top = '0';
     renderer.domElement.style.left = '0';
@@ -290,7 +285,6 @@ export default function LiquidShaderBackground({ className = '' }) {
     };
 
     // 1. Sculpted Wave Ribbon Mesh with Stochastic Stipple Edge Dissolution
-    // High-density tessellation for fluid organic folds
     const waveGeo = new THREE.PlaneGeometry(10.2, 6.4, 260, 180);
     const waveMat = new THREE.ShaderMaterial({
       vertexShader: waveVertexShader,
@@ -301,7 +295,7 @@ export default function LiquidShaderBackground({ className = '' }) {
     const waveMesh = new THREE.Mesh(waveGeo, waveMat);
     scene.add(waveMesh);
 
-    // 2. Floating Ambient Dust / Sand Grains (2,400 particles drifting around the crest)
+    // 2. Floating Ambient Dust / Sand Grains (2,400 emerald particles)
     const dustCount = 2400;
     const dustGeo = new THREE.BufferGeometry();
     const dustPositions = new Float32Array(dustCount * 3);
@@ -309,7 +303,6 @@ export default function LiquidShaderBackground({ className = '' }) {
     const dustSeeds = new Float32Array(dustCount);
 
     for (let i = 0; i < dustCount; i++) {
-      // Clustered along the diagonal S-curve and upper-right crest
       const px = (Math.random() - 0.48) * 9.2;
       const spineY = Math.sin(px * 0.42 + 0.35) * 0.85 + 0.25;
       const py = spineY + (Math.random() - 0.5) * 2.8;
@@ -387,17 +380,14 @@ export default function LiquidShaderBackground({ className = '' }) {
 
       const delta = clock.getDelta();
 
-      // Fluid, slow, continuous undulation matching reference
       if (!prefersReducedMotion) {
         uniforms.uTime.value += delta * 0.75;
       }
 
-      // Smooth mouse interpolation
       currentMouse.x += (targetMouse.x - currentMouse.x) * 0.045;
       currentMouse.y += (targetMouse.y - currentMouse.y) * 0.045;
       uniforms.uMouse.value.copy(currentMouse);
 
-      // Subtle parallax camera tilt
       camera.position.x = currentMouse.x * 0.16;
       camera.position.y = -0.28 + currentMouse.y * 0.12;
       camera.lookAt(0, 0.22, 0);
