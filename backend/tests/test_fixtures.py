@@ -106,3 +106,34 @@ def test_fixture_oversized_input_bounded():
     }])
     assert findings[0].coverage_status == "OVERSIZED"
     assert findings[0].detected_type == "OVERSIZED"
+
+
+@pytest.mark.asyncio
+async def test_baseline_snapshot():
+    """Confirms score snapshot baseline is completely unchanged for existing fixtures."""
+    expected_snapshots = {
+        "benign.eml": {"overall_score": 0, "rating": RiskRatingEnum.LOW, "rules": []},
+        "reply_to_mismatch.eml": {"overall_score": 20, "rating": RiskRatingEnum.LOW, "rules": ["HDR_REPLYTO_MISMATCH"]},
+        "auth_failure.eml": {"overall_score": 95, "rating": RiskRatingEnum.HIGH, "rules": ["AUTH_SPF_FAIL", "AUTH_DMARC_FAIL", "BODY_URGENCY_PRESSURE", "BODY_CREDENTIAL_HARVEST"]},
+        "url_mismatch.eml": {"overall_score": 85, "rating": RiskRatingEnum.HIGH, "rules": ["HDR_DISPLAY_NAME_SPOOF", "URL_TEXT_HREF_MISMATCH", "URL_DECEPTIVE_SUBDOMAIN"]}
+    }
+
+    for f_name, snap in expected_snapshots.items():
+        with open(FIXTURES_DIR / f_name, "rb") as f:
+            raw_bytes = f.read()
+
+        state = {
+            "raw_bytes": raw_bytes,
+            "input_type": "eml",
+            "file_name": f_name,
+            "simulate_both_fail": True,
+            "trace": []
+        }
+        result_state = await investigation_graph.ainvoke(state)
+        result = result_state["final_result"]
+
+        assert result.risk.overall_score == snap["overall_score"], f"{f_name} score diverged: expected {snap['overall_score']}, got {result.risk.overall_score}"
+        assert result.risk.overall_rating == snap["rating"], f"{f_name} rating diverged"
+        actual_rules = [e.rule_id for e in result.evidence]
+        assert set(actual_rules) == set(snap["rules"]), f"{f_name} rules diverged: expected {snap['rules']}, got {actual_rules}"
+

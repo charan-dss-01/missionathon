@@ -7,6 +7,7 @@ from app.models.schemas import (
     AttachmentFinding
 )
 from app.engine.rule_definitions import RULE_DEFINITIONS
+from app.engine.qr_rules import QR_RULE_DEFINITIONS # FEATURE:qr
 
 class RiskEngine:
     """

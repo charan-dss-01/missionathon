@@ -44,5 +44,6 @@ class Settings:
     MAX_ARCHIVE_ENTRIES: int = 50
     REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "30"))
     FEATURE_INSIGHTS: bool = os.getenv("FEATURE_INSIGHTS", "true").lower() in ("true", "1", "yes") # FEATURE:insights
+    FEATURE_QR: bool = os.getenv("FEATURE_QR", "true").lower() in ("true", "1", "yes") # FEATURE:qr
 
 settings = Settings()
