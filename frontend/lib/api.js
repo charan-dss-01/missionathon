@@ -1,9 +1,13 @@
 function getApiBaseUrl() {
+  const publicUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (publicUrl && typeof publicUrl === 'string' && publicUrl.trim() && !publicUrl.includes('127.0.0.1') && !publicUrl.includes('localhost')) {
+    return publicUrl.trim().replace(/\/+$/, '');
+  }
   if (typeof window !== 'undefined') {
     // In browser, using relative path allows Next.js rewrite proxy to forward to FastAPI seamlessly
     return '';
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 }
 
 function getStoredToken() {

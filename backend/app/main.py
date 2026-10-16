@@ -49,18 +49,16 @@ async def add_request_id_and_error_handling(request: Request, call_next):
         )
 
 # Configure CORS as OUTERMOST middleware
-cors_origins = [o.strip() for o in settings.CORS_ORIGINS if o.strip()]
-if not cors_origins:
-    cors_origins = ["*"]
+cors_origins = [o.strip() for o in settings.CORS_ORIGINS if o.strip() and o.strip() != "*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"^https?:\/\/(localhost|127\.0\.0\.1|.*\.vercel\.app)(:\d+)?$",
+    allow_origin_regex=r"^(https:\/\/.*\.vercel\.app|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["Content-Disposition", "X-Request-ID"],
 )
 
 # Register routes
