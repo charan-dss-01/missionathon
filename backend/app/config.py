@@ -43,5 +43,6 @@ class Settings:
     MAX_ATTACHMENT_SIZE_BYTES: int = 5 * 1024 * 1024 # 5MB per attachment
     MAX_ARCHIVE_ENTRIES: int = 50
     REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "30"))
+    FEATURE_INSIGHTS: bool = os.getenv("FEATURE_INSIGHTS", "true").lower() in ("true", "1", "yes") # FEATURE:insights
 
 settings = Settings()

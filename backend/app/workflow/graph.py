@@ -24,6 +24,11 @@ from app.analyzers.attachment_analyzer import AttachmentAnalyzer
 from app.engine.risk_engine import RiskEngine
 from app.services.llm_router import LLMRouter
 from app.services.evidence_validator import EvidenceValidator
+from app.config import settings  # FEATURE:insights
+from app.services.insights_builder import build_insights  # FEATURE:insights
+import logging  # FEATURE:insights
+
+logger = logging.getLogger(__name__)  # FEATURE:insights
 
 class InvestigationState(TypedDict, total=False):
     investigation_id: str
@@ -53,6 +58,7 @@ class InvestigationState(TypedDict, total=False):
     # Risk & Synthesis
     risk: Optional[ComponentRisk]
     llm_interpretation: Optional[LLMInterpretation]
+    insights: Optional[Any]  # FEATURE:insights
     trace: List[TraceStep]
     error: Optional[str]
     final_result: Optional[InvestigationResult]
@@ -288,7 +294,24 @@ def aggregate_evidence_node(state: InvestigationState) -> Dict[str, Any]:
         f"Aggregated {len(deduped)} unique authoritative evidence findings across all modules.",
         {"total_findings": len(deduped)}
     )
-    return {"aggregated_evidence": deduped, "trace": state["trace"]}
+
+    # FEATURE:insights
+    insights = None
+    if getattr(settings, "FEATURE_INSIGHTS", True):
+        try:
+            insights = build_insights(
+                metadata=state.get("email_metadata"),
+                plain_body=state.get("plain_body", ""),
+                html_body=state.get("html_body", ""),
+                url_findings=state.get("url_findings", []) or [],
+                attachment_findings=state.get("attachment_findings", []) or [],
+                evidence_records=deduped
+            )
+        except Exception as e:
+            logger.warning("Failed to build presentation insights: %s", e)
+            insights = None
+
+    return {"aggregated_evidence": deduped, "insights": insights, "trace": state["trace"]}
 
 
 # Node 7: calculate_risk
@@ -417,7 +440,8 @@ def generate_report_node(state: InvestigationState) -> Dict[str, Any]:
         attachments=attachment_findings,
         llm_interpretation=interpretation,
         trace=trace,
-        review_status="NEW"
+        review_status="NEW",
+        insights=state.get("insights")  # FEATURE:insights
     )
 
     _record_trace(

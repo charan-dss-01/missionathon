@@ -418,6 +418,14 @@ class MemoryStore:
             review_notes="Verified against expected monthly billing recurring schedule."
         )
 
+        # FEATURE:insights
+        try:
+            from app.services.insights_builder import build_insights
+            inv1.insights = build_insights(inv1.email_metadata, "", "", inv1.urls, inv1.attachments, inv1.evidence)
+            inv2.insights = build_insights(inv2.email_metadata, "", "", inv2.urls, inv2.attachments, inv2.evidence)
+        except Exception:
+            pass
+
         self._investigations[inv1.id] = inv1
         self._investigations[inv2.id] = inv2
 

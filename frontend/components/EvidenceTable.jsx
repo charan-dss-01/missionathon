@@ -77,7 +77,11 @@ export default function EvidenceTable({ evidence = [] }) {
           </thead>
           <tbody>
             {filteredEvidence.map((record, idx) => (
-              <tr key={`${record.rule_id}-${idx}`} className="hover:bg-muted/30 transition">
+              <tr
+                key={`${record.rule_id}-${idx}`}
+                id={`evidence-row-${record.rule_id}`} /* FEATURE:timeline */
+                className="hover:bg-muted/30 transition"
+              >
                 <td className="align-top py-2.5">
                   <SeverityBadge severity={record.severity} />
                 </td>
