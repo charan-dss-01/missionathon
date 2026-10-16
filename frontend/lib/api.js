@@ -192,6 +192,89 @@ export async function analyzeFormData(formData) {
   return await res.json();
 }
 
+export async function analyzeFormDataStream(formData, onEvent) {
+  const base = getApiBaseUrl();
+  const res = await fetch(`${base}/api/analyze/stream`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || `Server error: ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let finalResult = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const messages = buffer.split('\n\n');
+    buffer = messages.pop() || '';
+
+    for (const msg of messages) {
+      if (!msg.trim()) continue;
+      const lines = msg.split('\n');
+      let eventType = 'message';
+      let dataStr = '';
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          eventType = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          dataStr += line.slice(5).trim();
+        }
+      }
+
+      if (dataStr) {
+        try {
+          const parsedData = JSON.parse(dataStr);
+          if (eventType === 'complete' && parsedData.result) {
+            finalResult = parsedData.result;
+          }
+          if (onEvent) {
+            onEvent({ event: eventType, data: parsedData });
+          }
+        } catch (e) {
+          console.warn('Failed to parse SSE data frame:', dataStr, e);
+        }
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    const lines = buffer.split('\n');
+    let eventType = 'message';
+    let dataStr = '';
+    for (const line of lines) {
+      if (line.startsWith('event:')) eventType = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
+    }
+    if (dataStr) {
+      try {
+        const parsedData = JSON.parse(dataStr);
+        if (eventType === 'complete' && parsedData.result) finalResult = parsedData.result;
+        if (onEvent) onEvent({ event: eventType, data: parsedData });
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new Error('Analysis completed without producing a valid dossier.');
+  }
+
+  return finalResult;
+}
+
 export async function analyzeJson(payload) {
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/analyze/json`, {

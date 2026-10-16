@@ -1,10 +1,11 @@
 import io
 import csv
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Response, Depends, status
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 
 from app.config import settings
 from app.models.schemas import (
@@ -166,6 +167,205 @@ async def analyze_input_json(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+ORDERED_PIPELINE_STAGES = [
+    ("parse_input", "Parse Raw Inbound Payload"),
+    ("analyze_headers", "Inspect Authentication & Sender Headers"),
+    ("analyze_body", "Inspect Body Language & HTML Hyperlinks"),
+    ("analyze_urls", "Static Syntactic URL Inspection"),
+    ("analyze_attachments", "Static Attachment & File Signature Analysis"),
+    ("aggregate_evidence", "Aggregate Security Findings & Deduplicate"),
+    ("calculate_risk", "Deterministic Risk Engine Evaluation"),
+    ("interpret_with_llm", "Tier-3 AI Synthesis (Gemini / Groq / Fallback)"),
+    ("validate_evidence", "Validate LLM Claims Against Authoritative Evidence"),
+    ("generate_report", "Assemble Final SOC Investigation Dossier"),
+]
+
+@router.post("/analyze/stream")
+async def analyze_input_stream(
+    raw_content: Optional[str] = Form(None),
+    input_type: Optional[str] = Form("raw_text"),
+    force_fallback: Optional[bool] = Form(False),
+    simulate_both_fail: Optional[bool] = Form(False),
+    file: Optional[UploadFile] = File(None),
+    current_user: Optional[UserProfileResponse] = Depends(get_optional_current_user)
+):
+    """
+    Real-time Server-Sent Events (SSE) investigation analysis endpoint.
+    Streams LangGraph node execution events (node_started, node_completed, complete)
+    as they occur deterministically in real time.
+    """
+    raw_bytes = None
+    file_name = None
+    actual_content = raw_content or ""
+    actual_input_type = input_type or "raw_text"
+
+    if file:
+        file_name = file.filename
+        raw_bytes = await file.read()
+        if len(raw_bytes) > settings.MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Uploaded file exceeds {settings.MAX_UPLOAD_BYTES / (1024*1024):.0f}MB bounded limit."
+            )
+        if file_name and file_name.lower().endswith(".eml"):
+            actual_input_type = "eml"
+        else:
+            actual_input_type = "attachment"
+
+    inv_id = f"inv-{uuid.uuid4().hex[:8]}"
+    initial_state = {
+        "investigation_id": inv_id,
+        "raw_content": actual_content,
+        "raw_bytes": raw_bytes,
+        "file_name": file_name,
+        "input_type": actual_input_type,
+        "force_fallback": bool(force_fallback),
+        "simulate_both_fail": bool(simulate_both_fail),
+        "trace": []
+    }
+    owner_id = current_user.id if current_user else "anonymous"
+
+    async def event_generator():
+        # 1. Pipeline started
+        yield f"event: pipeline_started\ndata: {json.dumps({'event': 'pipeline_started', 'investigation_id': inv_id, 'timestamp': datetime.now(timezone.utc).isoformat(), 'input_type': actual_input_type})}\n\n"
+
+        # 2. First node start
+        first_node, first_name = ORDERED_PIPELINE_STAGES[0]
+        yield f"event: node_started\ndata: {json.dumps({'event': 'node_started', 'investigation_id': inv_id, 'node': first_node, 'name': first_name, 'status': 'RUNNING', 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
+
+        accumulated_state = dict(initial_state)
+        stage_keys = [s[0] for s in ORDERED_PIPELINE_STAGES]
+
+        try:
+            async for chunk in investigation_graph.astream(initial_state):
+                for node_name, state_update in chunk.items():
+                    accumulated_state.update(state_update)
+                    trace_steps = state_update.get("trace", []) or accumulated_state.get("trace", [])
+                    matching_step = next((s for s in reversed(trace_steps) if s.node == node_name), None)
+
+                    status_str = matching_step.status.value if (matching_step and hasattr(matching_step.status, 'value')) else (str(matching_step.status) if matching_step else "COMPLETED")
+                    duration_ms = matching_step.duration_ms if matching_step else 0.0
+                    summary = matching_step.message if matching_step else f"{node_name} completed."
+                    data_summary = matching_step.data_summary if matching_step else {}
+
+                    finding_count = 0
+                    if "indicators" in data_summary:
+                        finding_count = data_summary["indicators"]
+                    elif "total_findings" in data_summary:
+                        finding_count = data_summary["total_findings"]
+                    elif "findings_count" in data_summary:
+                        finding_count = data_summary["findings_count"]
+                    elif "url_count" in data_summary:
+                        finding_count = data_summary.get("indicators", 0)
+                    elif "attachments_count" in data_summary:
+                        finding_count = data_summary["attachments_count"]
+
+                    node_completed_event = {
+                        "event": "node_completed",
+                        "investigation_id": inv_id,
+                        "node": node_name,
+                        "name": matching_step.name if matching_step else node_name,
+                        "status": status_str,
+                        "duration_ms": duration_ms,
+                        "finding_count": finding_count,
+                        "summary": summary,
+                        "data_summary": data_summary,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                    yield f"event: node_completed\ndata: {json.dumps(node_completed_event)}\n\n"
+
+                    # Emit node_started for next stage
+                    if node_name in stage_keys:
+                        idx = stage_keys.index(node_name)
+                        if idx + 1 < len(ORDERED_PIPELINE_STAGES):
+                            next_node, next_name = ORDERED_PIPELINE_STAGES[idx + 1]
+                            next_started = {
+                                "event": "node_started",
+                                "investigation_id": inv_id,
+                                "node": next_node,
+                                "name": next_name,
+                                "status": "RUNNING",
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }
+                            yield f"event: node_started\ndata: {json.dumps(next_started)}\n\n"
+
+            # 3. Final Result Dossier Assembly
+            result: Optional[InvestigationResult] = accumulated_state.get("final_result")
+            if not result:
+                yield f"event: error\ndata: {json.dumps({'event': 'error', 'investigation_id': inv_id, 'error': 'Pipeline did not yield a final dossier.'})}\n\n"
+                return
+
+            result.owner_id = owner_id
+
+            if db_manager.is_connected:
+                col = db_manager.get_investigations_col()
+                doc = result.model_dump()
+                doc["_id"] = result.id
+                await col.replace_one({"_id": result.id}, doc, upsert=True)
+
+            store.add(result)
+
+            # 4. Final events
+            result_dict = result.model_dump(mode="json")
+            yield f"event: complete\ndata: {json.dumps({'event': 'complete', 'investigation_id': inv_id, 'result': result_dict})}\n\n"
+            yield f"event: pipeline_completed\ndata: {json.dumps({'event': 'pipeline_completed', 'investigation_id': inv_id, 'status': 'COMPLETED', 'overall_score': result.risk.overall_score if result.risk else 0, 'overall_rating': result.risk.overall_rating.value if result.risk else 'UNKNOWN', 'total_evidence': len(result.evidence)})}\n\n"
+
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'event': 'error', 'investigation_id': inv_id, 'error': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+@router.get("/investigations/{id}/events")
+async def get_investigation_events(id: str):
+    """
+    Returns recorded SSE events for an existing investigation for replay or visual sync.
+    """
+    inv = store.get(id)
+    if not inv and db_manager.is_connected:
+        col = db_manager.get_investigations_col()
+        doc = await col.find_one({"_id": id})
+        if doc:
+            inv = InvestigationResult(**doc)
+
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Investigation '{id}' not found.")
+
+    async def event_generator():
+        yield f"event: pipeline_started\ndata: {json.dumps({'event': 'pipeline_started', 'investigation_id': id, 'timestamp': inv.created_at.isoformat(), 'input_type': inv.input_type})}\n\n"
+        for step in inv.trace:
+            finding_count = (step.data_summary or {}).get("indicators") or (step.data_summary or {}).get("total_findings") or (step.data_summary or {}).get("findings_count") or 0
+            ev = {
+                "event": "node_completed",
+                "investigation_id": id,
+                "node": step.node,
+                "name": step.name,
+                "status": step.status.value if hasattr(step.status, 'value') else str(step.status),
+                "duration_ms": step.duration_ms,
+                "finding_count": finding_count,
+                "summary": step.message,
+                "data_summary": step.data_summary or {},
+                "timestamp": step.end_time.isoformat() if step.end_time else datetime.now(timezone.utc).isoformat()
+            }
+            yield f"event: node_completed\ndata: {json.dumps(ev)}\n\n"
+
+        result_dict = inv.model_dump(mode="json")
+        yield f"event: complete\ndata: {json.dumps({'event': 'complete', 'investigation_id': id, 'result': result_dict})}\n\n"
+        yield f"event: pipeline_completed\ndata: {json.dumps({'event': 'pipeline_completed', 'investigation_id': id, 'status': inv.status, 'overall_score': inv.risk.overall_score if inv.risk else 0, 'overall_rating': inv.risk.overall_rating.value if inv.risk else 'UNKNOWN', 'total_evidence': len(inv.evidence)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"}
+    )
 
 @router.get("/investigations", response_model=List[InvestigationResult])
 async def list_investigations(
@@ -341,6 +541,14 @@ async def export_investigation(
     res = await _get_investigation_with_ownership_check(inv_id, current_user)
     fmt = format.lower()
 
+    def _sanitize_csv(cell: Any) -> Any:
+        if cell is None:
+            return ""
+        s = str(cell)
+        if s and s[0] in ["=", "+", "-", "@", "\t", "\r"]:
+            return f"'{s}"
+        return s
+
     if fmt == "csv":
         output = io.StringIO()
         writer = csv.writer(output)
@@ -349,25 +557,25 @@ async def export_investigation(
         if res.evidence:
             for ev in res.evidence:
                 writer.writerow([
-                    res.id,
-                    res.created_at.isoformat(),
-                    res.risk.overall_rating.value,
-                    res.risk.overall_score,
-                    res.risk.email_score,
-                    res.risk.attachment_score,
-                    ev.rule_id,
-                    ev.title,
-                    ev.severity.value,
-                    ev.supporting_observation
+                    _sanitize_csv(res.id),
+                    _sanitize_csv(res.created_at.isoformat()),
+                    _sanitize_csv(res.risk.overall_rating.value),
+                    _sanitize_csv(res.risk.overall_score),
+                    _sanitize_csv(res.risk.email_score),
+                    _sanitize_csv(res.risk.attachment_score),
+                    _sanitize_csv(ev.rule_id),
+                    _sanitize_csv(ev.title),
+                    _sanitize_csv(ev.severity.value),
+                    _sanitize_csv(ev.supporting_observation)
                 ])
         else:
             writer.writerow([
-                res.id,
-                res.created_at.isoformat(),
-                res.risk.overall_rating.value,
-                res.risk.overall_score,
-                res.risk.email_score,
-                res.risk.attachment_score,
+                _sanitize_csv(res.id),
+                _sanitize_csv(res.created_at.isoformat()),
+                _sanitize_csv(res.risk.overall_rating.value),
+                _sanitize_csv(res.risk.overall_score),
+                _sanitize_csv(res.risk.email_score),
+                _sanitize_csv(res.risk.attachment_score),
                 "NONE", "No High Risk Indicators", "LOW", "Clean static analysis"
             ])
 
@@ -382,6 +590,12 @@ async def export_investigation(
             f"**Risk Score:** {res.risk.overall_score}/100 ({res.risk.overall_rating.value})  ",
             f"**Email Vector Score:** {res.risk.email_score}/100 | **Attachment Score:** {res.risk.attachment_score}/100  ",
             f"**Coverage Status:** {res.risk.coverage_status.value}  ",
+            f"**Scoring Explanation:** {res.risk.scoring_explanation}  ",
+            "",
+            "## Mandatory Safe Verification Guidance",
+            "1. **Verify Official Channel:** Verify the message through an independently obtained official channel (out-of-band portal or verified phone).",
+            "2. **Protect Credentials:** Never enter passwords, credentials, or MFA codes via links received in unexpected messages.",
+            "3. **Report Immediately:** Report suspicious messages to the internal IT or Information Security team for quarantine.",
             "",
             "## Executive AI Synthesis",
             f"**Provider Used:** {res.llm_interpretation.provider_used.upper()} " +
@@ -405,6 +619,26 @@ async def export_investigation(
 
         if not res.evidence:
             md_lines.append("| `NONE` | baseline | Clean Static Analysis | LOW | No threat signatures detected |")
+
+        if res.attachments:
+            md_lines.extend([
+                "",
+                "## Attachment Inventory",
+                "| Filename | Declared MIME | Detected Type | Size (Bytes) | SHA-256 | Status | Limitations |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            ])
+            for att in res.attachments:
+                md_lines.append(f"| `{att.filename}` | {att.declared_mime or 'None'} | {att.detected_type} | {att.size_bytes} | `{att.sha256[:16]}...` | **{att.coverage_status}** | {att.limitations} |")
+
+        if res.urls:
+            md_lines.extend([
+                "",
+                "## URL Inspection Results",
+                "| URL | Domain | IP Literal | Punycode | Deceptive Subdomain | Severity |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- |"
+            ])
+            for u in res.urls:
+                md_lines.append(f"| `{u.url[:60]}` | {u.domain} | {u.is_ip_literal} | {u.is_punycode} | {u.has_deceptive_subdomains} | {u.severity.value} |")
 
         md_lines.extend([
             "",

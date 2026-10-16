@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.config import settings
 from app.db.mongodb import db_manager
+from app.storage.memory_store import store
 from app.models.user import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -43,16 +44,12 @@ async def register(req: UserRegisterRequest, request: Request, response: Respons
     if not db_manager.is_connected:
         await db_manager.ensure_connected()
 
-    if not db_manager.is_connected:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service unavailable. Cannot create account at this time."
-        )
+    if db_manager.is_connected:
+        users_col = db_manager.get_users_col()
+        existing_user = await users_col.find_one({"email": req.email})
+    else:
+        existing_user = store.get_user_by_email(req.email)
 
-    users_col = db_manager.get_users_col()
-    
-    # Check if email is already registered
-    existing_user = await users_col.find_one({"email": req.email})
     if existing_user:
         await AuthService.log_audit_event("REGISTER_DUPLICATE_ATTEMPT", ip_address=client_ip, details={"email": req.email})
         raise HTTPException(
@@ -76,7 +73,11 @@ async def register(req: UserRegisterRequest, request: Request, response: Respons
         "last_login": now
     }
 
-    await users_col.insert_one(user_doc)
+    if db_manager.is_connected:
+        await users_col.insert_one(user_doc)
+    else:
+        store.add_user(user_doc)
+
     await AuthService.log_audit_event("REGISTER_SUCCESS", user_id=user_id, ip_address=client_ip)
 
     # Issue JWT
@@ -110,14 +111,11 @@ async def login(req: UserLoginRequest, request: Request, response: Response):
     if not db_manager.is_connected:
         await db_manager.ensure_connected()
 
-    if not db_manager.is_connected:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service unavailable. Please try again later."
-        )
-
-    users_col = db_manager.get_users_col()
-    user_doc = await users_col.find_one({"email": req.email})
+    if db_manager.is_connected:
+        users_col = db_manager.get_users_col()
+        user_doc = await users_col.find_one({"email": req.email})
+    else:
+        user_doc = store.get_user_by_email(req.email)
 
     if not user_doc or not AuthService.verify_password(req.password, user_doc.get("password_hash", "")):
         await AuthService.log_audit_event("LOGIN_FAILED", ip_address=client_ip, details={"email": req.email})
@@ -133,7 +131,11 @@ async def login(req: UserLoginRequest, request: Request, response: Response):
         )
 
     now = datetime.now(timezone.utc)
-    await users_col.update_one({"id": user_doc["id"]}, {"$set": {"last_login": now}})
+    if db_manager.is_connected:
+        await users_col.update_one({"id": user_doc["id"]}, {"$set": {"last_login": now}})
+    else:
+        store.update_user(user_doc["id"], {"last_login": now})
+
     await AuthService.log_audit_event("LOGIN_SUCCESS", user_id=user_doc["id"], ip_address=client_ip)
 
     token = AuthService.create_access_token(user_doc["id"], user_doc["email"], user_doc.get("role", "user"))
@@ -188,11 +190,11 @@ async def change_password(
     if not db_manager.is_connected:
         await db_manager.ensure_connected()
 
-    if not db_manager.is_connected:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable.")
-
-    users_col = db_manager.get_users_col()
-    user_doc = await users_col.find_one({"id": current_user.id})
+    if db_manager.is_connected:
+        users_col = db_manager.get_users_col()
+        user_doc = await users_col.find_one({"id": current_user.id})
+    else:
+        user_doc = store.get_user_by_id(current_user.id)
 
     if not user_doc or not AuthService.verify_password(req.current_password, user_doc.get("password_hash", "")):
         raise HTTPException(
@@ -203,10 +205,13 @@ async def change_password(
     new_hash = AuthService.hash_password(req.new_password)
     now = datetime.now(timezone.utc)
 
-    await users_col.update_one(
-        {"id": current_user.id},
-        {"$set": {"password_hash": new_hash, "updated_at": now}}
-    )
+    if db_manager.is_connected:
+        await users_col.update_one(
+            {"id": current_user.id},
+            {"$set": {"password_hash": new_hash, "updated_at": now}}
+        )
+    else:
+        store.update_user(current_user.id, {"password_hash": new_hash, "updated_at": now})
 
     client_ip = request.client.host if request.client else "unknown"
     await AuthService.log_audit_event("PASSWORD_CHANGE", user_id=current_user.id, ip_address=client_ip)

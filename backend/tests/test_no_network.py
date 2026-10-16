@@ -31,6 +31,7 @@ async def test_zero_network_during_all_corpus_analysis():
     fixture_files = ["benign.eml", "reply_to_mismatch.eml", "auth_failure.eml", "url_mismatch.eml"]
 
     with patch.object(socket.socket, "connect", _blocked_connect), \
+         patch("socket.create_connection", _blocked_connect), \
          patch("socket.getaddrinfo", _blocked_dns):
 
         # 1. Analyze every corpus email fixture

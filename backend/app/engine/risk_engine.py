@@ -69,21 +69,34 @@ class RiskEngine:
         else:
             overall_score = email_score
 
-        # Determine Rating
-        if overall_score < cls.LOW_THRESHOLD:
-            overall_rating = RiskRatingEnum.LOW
-        elif overall_score < cls.MEDIUM_THRESHOLD:
-            overall_rating = RiskRatingEnum.MEDIUM
-        else:
-            overall_rating = RiskRatingEnum.HIGH
-
         # Determine Coverage Status
         coverage_status = CoverageStatusEnum.FULL
+        has_unscanned = any(a.coverage_status in ["UNSCANNED", "OVERSIZED"] for a in attachments)
+        has_unknown = any(a.coverage_status in ["UNKNOWN", "CORRUPT"] for a in attachments)
+        has_unsupported = any(a.coverage_status == "UNSUPPORTED" for a in attachments)
         unscanned_count = sum(1 for a in attachments if a.coverage_status in ["UNKNOWN", "UNSCANNED", "UNSUPPORTED", "CORRUPT", "OVERSIZED"])
-        if unscanned_count > 0:
+
+        if attachments and all(a.coverage_status in ["UNSCANNED", "OVERSIZED"] for a in attachments):
+            coverage_status = CoverageStatusEnum.UNSCANNED
+        elif attachments and all(a.coverage_status in ["UNKNOWN", "CORRUPT"] for a in attachments):
+            coverage_status = CoverageStatusEnum.UNKNOWN
+        elif unscanned_count > 0:
             coverage_status = CoverageStatusEnum.PARTIAL
         if not has_headers and not has_email_body and not attachments:
             coverage_status = CoverageStatusEnum.INCOMPLETE
+
+        # Determine Rating: Enforce "Inputs beyond limits are marked UNSCANNED, never SAFE"
+        if overall_score >= cls.MEDIUM_THRESHOLD:
+            overall_rating = RiskRatingEnum.HIGH
+        elif overall_score >= cls.LOW_THRESHOLD:
+            overall_rating = RiskRatingEnum.MEDIUM
+        elif has_unscanned:
+            # Beyond limits: marked UNSCANNED, never SAFE
+            overall_rating = RiskRatingEnum.UNSCANNED
+        elif has_unknown and overall_score == 0:
+            overall_rating = RiskRatingEnum.UNKNOWN
+        else:
+            overall_rating = RiskRatingEnum.LOW
 
         # Explanation formulation
         explanation_parts = []
@@ -96,13 +109,23 @@ class RiskEngine:
             explanation_parts.append(
                 f"SUSPICIOUS / ELEVATED RISK ({overall_score}/100): Multiple anomalies detected requiring cautious human verification."
             )
+        elif overall_rating == RiskRatingEnum.UNSCANNED:
+            explanation_parts.append(
+                f"UNSCANNED ({overall_score}/100): Attachment(s) exceeded inspection bounds or email limit. "
+                "Inputs beyond limits are marked UNSCANNED, never SAFE."
+            )
+        elif overall_rating == RiskRatingEnum.UNKNOWN:
+            explanation_parts.append(
+                f"UNKNOWN STATUS ({overall_score}/100): Attachment(s) could not be parsed or are encrypted. "
+                "Unparseable inputs are reported as UNKNOWN and must not be assumed safe."
+            )
         else:
             explanation_parts.append(
                 f"LOW IDENTIFIED RISK ({overall_score}/100): No authoritative high-severity phishing signatures detected in static analysis. "
                 "Notice: Low score does NOT guarantee safety."
             )
 
-        if coverage_status != CoverageStatusEnum.FULL:
+        if coverage_status != CoverageStatusEnum.FULL and overall_rating not in [RiskRatingEnum.UNSCANNED, RiskRatingEnum.UNKNOWN]:
             explanation_parts.append(
                 f"Coverage Notice ({coverage_status.value}): Some attachments or artifacts were unsupported or incomplete."
             )

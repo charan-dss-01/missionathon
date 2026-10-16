@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   Download,
-  Share2,
   FileText,
   GitBranch,
   ArrowLeft,
@@ -20,10 +19,15 @@ import {
   Link as LinkIcon,
   Paperclip,
   Info,
-  ArrowUpRight,
   Save,
   Lock,
-  ChevronDown
+  ChevronDown,
+  Hash,
+  Shield,
+  FileQuestion,
+  AlertOctagon,
+  HelpCircle,
+  Activity
 } from 'lucide-react';
 import {
   fetchInvestigationById,
@@ -31,8 +35,10 @@ import {
   getExportDownloadUrl
 } from '@/lib/api';
 import RiskScoreBadge from '@/components/RiskScoreBadge';
+import SeverityBadge from '@/components/SeverityBadge';
 import EvidenceTable from '@/components/EvidenceTable';
 import ExecutionTraceTimeline from '@/components/ExecutionTraceTimeline';
+import InvestigationGraph from '@/components/orchestration/InvestigationGraph';
 import VictimTruthView from '@/components/VictimTruthView'; // FEATURE:victim-truth
 import AttackTimeline from '@/components/AttackTimeline'; // FEATURE:timeline
 
@@ -48,6 +54,7 @@ export default function InvestigationDossierPage() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [updatingReview, setUpdatingReview] = useState(false);
   const [reviewToast, setReviewToast] = useState(false);
+  const [traceViewMode, setTraceViewMode] = useState('graph'); // 'graph' | 'timeline'
 
   useEffect(() => {
     if (!id) return;
@@ -110,8 +117,20 @@ export default function InvestigationDossierPage() {
     );
   }
 
-  const { risk, evidence, llm_interpretation, email_metadata, execution_trace } = investigation;
+  const { risk, evidence, llm_interpretation, email_metadata, attachments = [], urls = [] } = investigation;
+  const traceList = investigation.trace || investigation.execution_trace || [];
   const isHighRisk = risk?.overall_rating === 'HIGH';
+  const isUnscanned = risk?.overall_rating === 'UNSCANNED' || risk?.overall_rating === 'UNKNOWN';
+
+  const recommendations = llm_interpretation?.actionable_recommendations || llm_interpretation?.recommended_actions || [];
+  const authResults = email_metadata?.recorded_auth || {};
+
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   return (
     <div className="overview-layout space-y-6">
@@ -133,7 +152,7 @@ export default function InvestigationDossierPage() {
             Investigation Dossier<span className="heading-dot">.</span>
           </h1>
           <p>
-            Deterministic Python rule evidence, AI synthesis, and execution timeline.
+            Deterministic Python rule evidence, static attachment verification, and transparent risk scoring.
           </p>
         </div>
 
@@ -179,12 +198,12 @@ export default function InvestigationDossierPage() {
           <div className="metric-foot">
             <span
               className={`status-badge badge-small ${
-                isHighRisk ? 'tone-danger' : 'tone-success'
+                isHighRisk ? 'tone-danger' : isUnscanned ? 'tone-warning' : 'tone-success'
               }`}
             >
               {risk?.overall_rating || 'LOW'}
             </span>
-            <span>{evidence?.length || 0} findings</span>
+            <span>{evidence?.length || 0} findings verified</span>
           </div>
         </div>
 
@@ -197,9 +216,9 @@ export default function InvestigationDossierPage() {
             {risk?.email_score || 0}
             <span className="metric-unit">/100</span>
           </div>
-          <div className="metric-foot">
-            <span>SPF/DKIM: {investigation.header_analysis?.spf_status || 'N/A'}</span>
-            <span>DMARC: {investigation.header_analysis?.dmarc_status || 'N/A'}</span>
+          <div className="metric-foot font-mono text-[10px]">
+            <span>SPF: {authResults.spf_result || 'NONE'} | DKIM: {authResults.dkim_result || 'NONE'}</span>
+            <span>DMARC: {authResults.dmarc_result || 'NONE'}</span>
           </div>
         </div>
 
@@ -213,10 +232,8 @@ export default function InvestigationDossierPage() {
             <span className="metric-unit">/100</span>
           </div>
           <div className="metric-foot">
-            <span>
-              {investigation.attachment_analysis?.attachments?.length || 0} safe files
-            </span>
-            <span>Air-gapped</span>
+            <span>{attachments.length} attachment(s)</span>
+            <span>Air-Gapped Byte Scan</span>
           </div>
         </div>
 
@@ -227,32 +244,94 @@ export default function InvestigationDossierPage() {
           </div>
           <div className="metric-value health-value text-base uppercase font-mono">
             <span className="health-dot tone-info" />
-            {llm_interpretation?.provider || 'Deterministic'}
+            {llm_interpretation?.provider_used || 'Deterministic'}
           </div>
           <div className="metric-foot">
-            <span>{llm_interpretation?.model || 'Rule Templates'}</span>
+            <span>{llm_interpretation?.attack_vector || 'Static Rule Grounded'}</span>
             <span className="text-primary font-mono text-[10px]">
-              {execution_trace?.length || 0} nodes
+              {traceList.length} nodes
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Navigation Tabs */}
+      {/* 3. Mandatory Safe Verification Guidance Card (Mission #73 Requirement) */}
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-4 text-xs space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-primary shrink-0" />
+          <h3 className="font-semibold text-foreground uppercase tracking-wider text-xs">
+            Decision-Support Notice &amp; Mandatory Verification Steps
+          </h3>
+        </div>
+        <p className="text-muted-foreground leading-relaxed text-[11px]">
+          This tool is a decision-support system, not a definitive guarantee that an email or attachment is safe or malicious. Always follow standard verification protocols:
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div className="p-3 rounded bg-card border border-border space-y-1">
+            <strong className="text-foreground font-semibold flex items-center gap-1.5 text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+              1. Verify Official Channel
+            </strong>
+            <p className="text-[11px] text-muted-foreground">
+              Verify unexpected messages or requests through an independently obtained official channel (corporate directory, verified portal, or known phone number).
+            </p>
+          </div>
+          <div className="p-3 rounded bg-card border border-border space-y-1">
+            <strong className="text-foreground font-semibold flex items-center gap-1.5 text-xs">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning" />
+              2. Protect Credentials
+            </strong>
+            <p className="text-[11px] text-muted-foreground">
+              Never enter passwords, corporate credentials, or one-time MFA codes through links received in email messages.
+            </p>
+          </div>
+          <div className="p-3 rounded bg-card border border-border space-y-1">
+            <strong className="text-foreground font-semibold flex items-center gap-1.5 text-xs">
+              <ShieldAlert className="w-3.5 h-3.5 text-danger" />
+              3. Report Suspicious Messages
+            </strong>
+            <p className="text-[11px] text-muted-foreground">
+              Immediately forward suspicious messages to your IT Security or SOC team and delete unverified attachments.
+            </p>
+          </div>
+        </div>
+        {risk?.scoring_explanation && (
+          <div className="pt-2 text-[11px] font-mono text-muted-foreground border-t border-border/50">
+            <span className="font-semibold text-foreground">Scoring Explanation: </span>
+            {risk.scoring_explanation}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Navigation Tabs */}
       <div className="table-tabs border-b border-border">
         <button
           onClick={() => setActiveTab('dossier')}
           className={`table-tab ${activeTab === 'dossier' ? 'active' : ''}`}
         >
           <FileText className="w-3.5 h-3.5 inline mr-1" />
-          Forensic Evidence &amp; AI Synthesis
+          Evidence &amp; Synthesis ({evidence?.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab('attachments')}
+          className={`table-tab ${activeTab === 'attachments' ? 'active' : ''}`}
+        >
+          <Paperclip className="w-3.5 h-3.5 inline mr-1" />
+          Attachment Inventory ({attachments.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('urls')}
+          className={`table-tab ${activeTab === 'urls' ? 'active' : ''}`}
+        >
+          <LinkIcon className="w-3.5 h-3.5 inline mr-1" />
+          URL Inspection ({urls.length})
         </button>
         <button
           onClick={() => setActiveTab('trace')}
           className={`table-tab ${activeTab === 'trace' ? 'active' : ''}`}
         >
           <GitBranch className="w-3.5 h-3.5 inline mr-1" />
-          LangGraph Execution Trace ({execution_trace?.length || 0})
+          Execution Trace ({traceList.length})
         </button>
         {email_metadata && (
           <button
@@ -265,7 +344,7 @@ export default function InvestigationDossierPage() {
         )}
       </div>
 
-      {/* 4. Tab 1: Dossier View */}
+      {/* 5. Tab 1: Dossier View */}
       {activeTab === 'dossier' && (
         <div className="space-y-6">
           {/* AI Synthesis Card */}
@@ -279,7 +358,7 @@ export default function InvestigationDossierPage() {
                   </h3>
                 </div>
                 <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                  Provider: {llm_interpretation.provider} ({llm_interpretation.model})
+                  Provider: {llm_interpretation.provider_used} {llm_interpretation.fallback_used ? `(Fallback: ${llm_interpretation.fallback_reason})` : ''}
                 </span>
               </div>
 
@@ -288,13 +367,13 @@ export default function InvestigationDossierPage() {
               </div>
 
               {/* Recommended SOC Actions */}
-              {llm_interpretation.recommended_actions?.length > 0 && (
+              {recommendations.length > 0 && (
                 <div className="pt-2">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase block mb-1.5 font-semibold">
                     Actionable SOC Countermeasures:
                   </span>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    {llm_interpretation.recommended_actions.map((act, idx) => (
+                    {recommendations.map((act, idx) => (
                       <li
                         key={idx}
                         className="p-2 rounded bg-background border border-border flex items-start gap-2"
@@ -387,23 +466,239 @@ export default function InvestigationDossierPage() {
         </div>
       )}
 
-      {/* 5. Tab 2: Execution Trace View */}
-      {activeTab === 'trace' && (
+      {/* 6. Tab 2: Attachment Inventory View (Mission #73 Mandatory Requirement) */}
+      {activeTab === 'attachments' && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <span className="eyebrow">GRAPH TIMELINE</span>
-              <h3 className="text-base font-semibold text-foreground">LangGraph Node Execution</h3>
+              <span className="eyebrow">STATIC FORENSIC METADATA</span>
+              <h3 className="text-base font-semibold text-foreground">Attachment Inventory</h3>
             </div>
             <span className="text-xs font-mono text-muted-foreground">
-              {execution_trace?.length || 0} nodes executed
+              {attachments.length} MIME part(s) inspected
             </span>
           </div>
-          <ExecutionTraceTimeline trace={execution_trace || []} />
+
+          {attachments.length === 0 ? (
+            <div className="empty-state p-8 border border-border bg-card rounded-md text-center space-y-2">
+              <Paperclip className="w-8 h-8 text-muted-foreground mx-auto" />
+              <strong className="text-sm text-foreground block">No Attachments Identified</strong>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                This email sample does not contain MIME attachments or multipart file streams.
+              </p>
+            </div>
+          ) : (
+            <div className="table-scroll border border-border rounded-md bg-card overflow-hidden">
+              <table className="workflow-table">
+                <thead>
+                  <tr>
+                    <th>Filename</th>
+                    <th>Declared Content-Type</th>
+                    <th>Detected Type (Magic Bytes)</th>
+                    <th>Size</th>
+                    <th>SHA-256 Hash</th>
+                    <th>Coverage Status</th>
+                    <th>Parsing Limitations / Traits</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attachments.map((att, idx) => {
+                    const isDangerous = att.dangerous_extension || att.rtlo_detected || att.double_extension || att.macro_detected;
+                    const statusClass =
+                      att.coverage_status === 'SCANNED'
+                        ? 'tone-success'
+                        : att.coverage_status === 'UNSCANNED' || att.coverage_status === 'OVERSIZED'
+                        ? 'tone-danger'
+                        : 'tone-warning';
+
+                    return (
+                      <tr key={`${att.filename}-${idx}`} className="hover:bg-muted/30 transition">
+                        <td className="align-top py-2.5 font-mono text-xs font-semibold text-foreground">
+                          <div className="flex items-center gap-1.5">
+                            {isDangerous ? (
+                              <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" />
+                            ) : (
+                              <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            )}
+                            <span title={att.filename} className="max-w-[180px] truncate block">
+                              {att.filename}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="align-top py-2.5 font-mono text-[11px] text-muted-foreground">
+                          {att.declared_mime || 'unspecified'}
+                        </td>
+                        <td className="align-top py-2.5 font-mono text-xs text-foreground">
+                          {att.detected_type || 'UNKNOWN'}
+                        </td>
+                        <td className="align-top py-2.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                          {formatBytes(att.size_bytes)}
+                        </td>
+                        <td className="align-top py-2.5 font-mono text-[10px] text-primary">
+                          <span title={att.sha256} className="cursor-help">
+                            {att.sha256 ? `${att.sha256.substring(0, 16)}...` : 'N/A'}
+                          </span>
+                        </td>
+                        <td className="align-top py-2.5">
+                          <span className={`status-badge badge-small ${statusClass}`}>
+                            {att.coverage_status}
+                          </span>
+                        </td>
+                        <td className="align-top py-2.5 text-[11px] text-muted-foreground max-w-xs">
+                          {att.limitations || 'Static inspection complete.'}
+                          {att.archive_members?.length > 0 && (
+                            <div className="mt-1 text-[10px] font-mono text-foreground bg-background p-1.5 rounded border border-border">
+                              Archive members: {att.archive_members.slice(0, 3).join(', ')}
+                              {att.archive_members.length > 3 ? ` (+${att.archive_members.length - 3} more)` : ''}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 
-      {/* 6. Tab 3: Raw Headers View */}
+      {/* 7. Tab 3: URL Inspection Findings (Mission #73 Mandatory Requirement) */}
+      {activeTab === 'urls' && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="eyebrow">STATIC SYNTACTIC SCAN</span>
+              <h3 className="text-base font-semibold text-foreground">Extracted URL Inspection</h3>
+            </div>
+            <span className="text-xs font-mono text-muted-foreground">
+              {urls.length} link target(s) extracted
+            </span>
+          </div>
+
+          {urls.length === 0 ? (
+            <div className="empty-state p-8 border border-border bg-card rounded-md text-center space-y-2">
+              <LinkIcon className="w-8 h-8 text-muted-foreground mx-auto" />
+              <strong className="text-sm text-foreground block">No URLs Extracted</strong>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                No outbound links, anchor tags, or raw URLs were discovered in this sample.
+              </p>
+            </div>
+          ) : (
+            <div className="table-scroll border border-border rounded-md bg-card overflow-hidden">
+              <table className="workflow-table">
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Extracted URL Target</th>
+                    <th>Domain / Host</th>
+                    <th>Syntactic Indicators</th>
+                    <th>Notes &amp; Limitations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {urls.map((u, idx) => {
+                    const traits = [];
+                    if (u.is_ip_literal) traits.push('IP Literal');
+                    if (u.is_punycode) traits.push('Punycode');
+                    if (u.has_confusable_chars) traits.push('Homoglyph');
+                    if (u.has_deceptive_subdomains) traits.push('Deceptive Subdomain');
+                    if (u.has_embedded_userinfo) traits.push('Embedded Userinfo');
+                    if (u.has_suspicious_encoding) traits.push('Double Encoding');
+
+                    return (
+                      <tr key={`${u.url}-${idx}`} className="hover:bg-muted/30 transition">
+                        <td className="align-top py-2.5">
+                          <SeverityBadge severity={u.severity} />
+                        </td>
+                        <td className="align-top py-2.5 font-mono text-xs text-foreground max-w-md">
+                          <div className="truncate font-medium text-primary select-all" title={u.url}>
+                            {u.url}
+                          </div>
+                          {u.display_text && (
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              Visible Anchor: &ldquo;{u.display_text}&rdquo;
+                            </div>
+                          )}
+                        </td>
+                        <td className="align-top py-2.5 font-mono text-xs text-muted-foreground">
+                          {u.domain || 'N/A'}
+                        </td>
+                        <td className="align-top py-2.5">
+                          {traits.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {traits.map((t) => (
+                                <span
+                                  key={t}
+                                  className="px-1.5 py-0.5 rounded bg-danger/10 text-danger text-[10px] font-mono border border-danger/20 font-semibold"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">Standard Syntax</span>
+                          )}
+                        </td>
+                        <td className="align-top py-2.5 text-[11px] text-muted-foreground max-w-xs">
+                          {u.notes || 'Static syntax evaluation only. No outbound HTTP/DNS query performed.'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 8. Tab 4: Execution Trace View */}
+      {activeTab === 'trace' && (
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+            <div>
+              <span className="eyebrow">GRAPH TIMELINE</span>
+              <h3 className="text-base font-semibold text-foreground">LangGraph Node Orchestration &amp; Trace</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="table-tabs">
+                <button
+                  type="button"
+                  onClick={() => setTraceViewMode('graph')}
+                  className={`table-tab ${traceViewMode === 'graph' ? 'active' : ''}`}
+                >
+                  <Activity className="w-3.5 h-3.5 inline mr-1" />
+                  Topology Graph
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTraceViewMode('timeline')}
+                  className={`table-tab ${traceViewMode === 'timeline' ? 'active' : ''}`}
+                >
+                  <Clock className="w-3.5 h-3.5 inline mr-1" />
+                  Linear Timeline
+                </button>
+              </div>
+              <span className="text-xs font-mono text-muted-foreground">
+                {traceList.length} nodes recorded
+              </span>
+            </div>
+          </div>
+
+          {traceViewMode === 'graph' ? (
+            <InvestigationGraph
+              trace={traceList}
+              status="completed"
+              result={investigation}
+            />
+          ) : (
+            <ExecutionTraceTimeline trace={traceList} />
+          )}
+        </section>
+      )}
+
+      {/* 9. Tab 5: Raw Headers View */}
       {activeTab === 'raw' && email_metadata && (
         <section className="bg-card border border-border rounded-md p-5 space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
@@ -411,10 +706,10 @@ export default function InvestigationDossierPage() {
           </h3>
           <div className="p-3 rounded bg-background border border-border font-mono text-xs overflow-x-auto space-y-1.5">
             <div>
-              <span className="text-muted-foreground">From:</span> {email_metadata.sender || 'N/A'}
+              <span className="text-muted-foreground">From:</span> {email_metadata.sender || 'N/A'} ({email_metadata.display_name || 'No display name'})
             </div>
             <div>
-              <span className="text-muted-foreground">To:</span> {email_metadata.recipient || 'N/A'}
+              <span className="text-muted-foreground">To:</span> {email_metadata.recipients?.join(', ') || 'N/A'}
             </div>
             <div>
               <span className="text-muted-foreground">Subject:</span> {email_metadata.subject || 'N/A'}
@@ -423,7 +718,26 @@ export default function InvestigationDossierPage() {
               <span className="text-muted-foreground">Date:</span> {email_metadata.date || 'N/A'}
             </div>
             <div>
-              <span className="text-muted-foreground">Reply-To:</span> {email_metadata.reply_to || 'N/A'}
+              <span className="text-muted-foreground">Reply-To:</span> {email_metadata.reply_to || 'None'}
+            </div>
+            <div>
+              <span className="text-muted-foreground">Return-Path:</span> {email_metadata.return_path || 'None'}
+            </div>
+            <div>
+              <span className="text-muted-foreground">Message-ID:</span> {email_metadata.message_id || 'None'}
+            </div>
+            <div className="pt-2 border-t border-border">
+              <span className="text-muted-foreground font-semibold">Recorded Authentication Headers:</span>
+              <div className="pl-2 mt-1 space-y-0.5 text-[11px]">
+                <div>SPF Result: <span className="text-foreground">{authResults.spf_result || 'NONE'}</span></div>
+                <div>DKIM Result: <span className="text-foreground">{authResults.dkim_result || 'NONE'}</span></div>
+                <div>DMARC Result: <span className="text-foreground">{authResults.dmarc_result || 'NONE'}</span></div>
+                {authResults.raw_header && (
+                  <div className="text-[10px] text-muted-foreground break-all mt-1 bg-card p-1.5 rounded border border-border">
+                    Raw: {authResults.raw_header}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>

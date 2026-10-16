@@ -67,12 +67,16 @@ export default function ExecutionTraceTimeline({ trace = [] }) {
       {/* Nodes list */}
       <div className="divide-y divide-border border border-border rounded-md bg-card overflow-hidden">
         {trace.map((step, idx) => {
-          const Icon = NODE_ICONS[step.node_name] || Activity;
+          const nodeKey = step.node || step.node_name || 'step';
+          const nodeTitle = step.name || step.node || step.node_name || 'Node Step';
+          const nodeSummary = step.message || step.summary || 'Node execution complete';
+          const dataSummary = step.data_summary || step.output_summary;
+          const Icon = NODE_ICONS[nodeKey] || Activity;
           const isExpanded = !!expandedNodes[idx];
           const isPassed = step.status === 'COMPLETED' || step.status === 'SUCCESS';
 
           return (
-            <div key={`${step.node_name}-${idx}`} className="transition hover:bg-muted/30">
+            <div key={`${nodeKey}-${idx}`} className="transition hover:bg-muted/30">
               <div
                 onClick={() => toggleExpand(idx)}
                 className="p-3.5 flex items-center justify-between cursor-pointer text-xs"
@@ -84,10 +88,10 @@ export default function ExecutionTraceTimeline({ trace = [] }) {
                   <Icon className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <span className="font-semibold text-foreground mr-2 font-mono">
-                      {step.node_name}
+                      {nodeTitle}
                     </span>
                     <span className="text-muted-foreground text-[11px]">
-                      {step.summary || 'Node execution complete'}
+                      {nodeSummary}
                     </span>
                   </div>
                 </div>
@@ -111,15 +115,15 @@ export default function ExecutionTraceTimeline({ trace = [] }) {
                 </div>
               </div>
 
-              {isExpanded && step.output_summary && (
+              {isExpanded && dataSummary && (
                 <div className="px-4 pb-3.5 pt-1 text-xs text-muted-foreground bg-background border-t border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase block mb-1">
-                    Node Observation Output:
+                    Node Observation Telemetry:
                   </span>
                   <pre className="p-2.5 rounded bg-card border border-border text-[11px] font-mono overflow-x-auto text-foreground">
-                    {typeof step.output_summary === 'object'
-                      ? JSON.stringify(step.output_summary, null, 2)
-                      : String(step.output_summary)}
+                    {typeof dataSummary === 'object'
+                      ? JSON.stringify(dataSummary, null, 2)
+                      : String(dataSummary)}
                   </pre>
                 </div>
               )}

@@ -18,9 +18,11 @@ import {
   Layers,
   Cpu,
   CheckCircle2,
-  Lock
+  Lock,
+  ExternalLink
 } from 'lucide-react';
-import { analyzeFormData } from '@/lib/api';
+import { analyzeFormData, analyzeFormDataStream } from '@/lib/api';
+import InvestigationGraph from '@/components/orchestration/InvestigationGraph';
 
 const PRESETS = [
   {
@@ -106,11 +108,20 @@ export default function InvestigatePage() {
   const [error, setError] = useState(null);
   const [loadingStep, setLoadingStep] = useState('');
 
+  // Live Graph Orchestration State
+  const [graphActive, setGraphActive] = useState(false);
+  const [graphStatus, setGraphStatus] = useState('idle'); // 'idle' | 'running' | 'completed' | 'failed'
+  const [activeNode, setActiveNode] = useState(null);
+  const [executionTrace, setExecutionTrace] = useState([]);
+  const [completedResult, setCompletedResult] = useState(null);
+
   const handlePresetSelect = (preset) => {
     setActiveTab(preset.type);
     setRawContent(preset.content);
     setUploadedFile(null);
     setError(null);
+    setGraphActive(false);
+    setCompletedResult(null);
   };
 
   const handleFileChange = (e) => {
@@ -125,6 +136,11 @@ export default function InvestigatePage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setGraphActive(true);
+    setGraphStatus('running');
+    setActiveNode('parse_input');
+    setExecutionTrace([]);
+    setCompletedResult(null);
     setLoadingStep('Initializing 10-node LangGraph orchestration...');
 
     try {
@@ -152,15 +168,70 @@ export default function InvestigatePage() {
         formData.append('input_type', 'raw_text');
       }
 
-      setLoadingStep('Executing deterministic Python rules & AI synthesis...');
-      const result = await analyzeFormData(formData);
+      setLoadingStep('Streaming LangGraph execution events...');
 
-      setLoadingStep('Compilation complete. Redirecting to investigation dossier...');
-      router.push(`/investigations/${result.id}`);
-    } catch (err) {
-      console.error(err);
-      setError(err.message || 'An error occurred during investigation execution.');
+      const result = await analyzeFormDataStream(formData, ({ event, data }) => {
+        if (event === 'node_started') {
+          setActiveNode(data.node);
+          setLoadingStep(`Executing stage: ${data.name || data.node}...`);
+        } else if (event === 'node_completed') {
+          setExecutionTrace((prev) => {
+            const existing = prev.filter((p) => p.node !== data.node);
+            return [
+              ...existing,
+              {
+                node: data.node,
+                name: data.name,
+                status: data.status,
+                duration_ms: data.duration_ms,
+                message: data.summary,
+                data_summary: data.data_summary,
+                finding_count: data.finding_count,
+              },
+            ];
+          });
+        } else if (event === 'complete' && data.result) {
+          setCompletedResult(data.result);
+          setGraphStatus('completed');
+          setActiveNode(null);
+          setLoading(false);
+          setLoadingStep('Analysis complete.');
+        }
+      });
+
+      setCompletedResult(result);
+      setGraphStatus('completed');
+      setActiveNode(null);
       setLoading(false);
+    } catch (err) {
+      console.warn('Stream interrupted or failed, attempting standard API fallback:', err);
+      try {
+        setLoadingStep('Re-syncing with backend trace...');
+        const formData = new FormData();
+        formData.append('force_fallback', forceFallback ? 'true' : 'false');
+        formData.append('simulate_both_fail', simulateBothFail ? 'true' : 'false');
+        if (activeTab === 'eml' || activeTab === 'attachment') {
+          formData.append('file', uploadedFile);
+          formData.append('input_type', activeTab);
+        } else if (activeTab === 'url') {
+          formData.append('raw_content', urlInput.trim());
+          formData.append('input_type', 'url');
+        } else {
+          formData.append('raw_content', rawContent.trim());
+          formData.append('input_type', 'raw_text');
+        }
+        const fallbackRes = await analyzeFormData(formData);
+        setCompletedResult(fallbackRes);
+        setExecutionTrace(fallbackRes.trace || []);
+        setGraphStatus('completed');
+        setActiveNode(null);
+        setLoading(false);
+      } catch (fallbackErr) {
+        setError(fallbackErr.message || err.message || 'Investigation error.');
+        setGraphStatus('failed');
+        setActiveNode(null);
+        setLoading(false);
+      }
     }
   };
 
@@ -187,6 +258,113 @@ export default function InvestigatePage() {
           </span>
         </div>
       </div>
+
+      {/* Live Agent Orchestration Graph (active when running or completed) */}
+      {graphActive && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="eyebrow flex items-center gap-1.5">
+                <span className="eyebrow-line" />
+                LIVE AGENT ORCHESTRATION GRAPH
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {completedResult && (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/investigations/${completedResult.id}`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition cursor-pointer"
+                >
+                  <span>Open Full Dossier</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setGraphActive(false);
+                  setCompletedResult(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-card hover:bg-accent text-muted-foreground transition cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset to Form</span>
+              </button>
+            </div>
+          </div>
+
+          <InvestigationGraph
+            trace={executionTrace}
+            activeNode={activeNode}
+            status={graphStatus}
+            result={completedResult}
+            onReset={() => {
+              setGraphActive(false);
+              setCompletedResult(null);
+            }}
+          />
+
+          {/* Investigation Outcome Summary Card */}
+          {completedResult && (
+            <div className="p-4 rounded-md border border-border bg-card shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                <div>
+                  <span className="text-[10px] font-mono text-muted-foreground block">INVESTIGATION DOSSIER</span>
+                  <strong className="text-base font-semibold text-foreground font-mono">
+                    {completedResult.id}
+                  </strong>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`status-badge font-mono text-xs px-2.5 py-1 ${
+                    completedResult.risk?.overall_rating === 'HIGH' ? 'tone-danger' :
+                    completedResult.risk?.overall_rating === 'MEDIUM' ? 'tone-warning' :
+                    'tone-success'
+                  }`}>
+                    {completedResult.risk?.overall_rating} RISK ({completedResult.risk?.overall_score}/100)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/investigations/${completedResult.id}`)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition cursor-pointer"
+                  >
+                    <span>View Full Dossier &amp; Evidence Chain</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Breakdown metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-2.5 rounded bg-background border border-border">
+                  <span className="text-muted-foreground text-[10px] block">Email Body Risk</span>
+                  <strong className="font-mono text-sm text-foreground">{completedResult.risk?.email_score ?? 0}/100</strong>
+                </div>
+                <div className="p-2.5 rounded bg-background border border-border">
+                  <span className="text-muted-foreground text-[10px] block">Attachment Risk</span>
+                  <strong className="font-mono text-sm text-foreground">{completedResult.risk?.attachment_score ?? 0}/100</strong>
+                </div>
+                <div className="p-2.5 rounded bg-background border border-border">
+                  <span className="text-muted-foreground text-[10px] block">Authoritative Evidence</span>
+                  <strong className="font-mono text-sm text-primary">{completedResult.evidence?.length ?? 0} signals</strong>
+                </div>
+                <div className="p-2.5 rounded bg-background border border-border">
+                  <span className="text-muted-foreground text-[10px] block">AI Synthesis Provider</span>
+                  <strong className="font-mono text-sm text-foreground uppercase">{completedResult.llm_interpretation?.provider_used || 'Rules'}</strong>
+                </div>
+              </div>
+
+              {/* Summary quote */}
+              {completedResult.llm_interpretation?.summary && (
+                <p className="text-xs text-muted-foreground bg-secondary/30 p-2.5 rounded border border-border/60 leading-relaxed">
+                  <strong className="text-foreground font-medium">Analyst Brief: </strong>
+                  {completedResult.llm_interpretation.summary}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 2. Synthetic Test Fixtures */}
       <div className="bg-card border border-border rounded-md p-4">

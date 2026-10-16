@@ -19,6 +19,8 @@ class RiskRatingEnum(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
+    UNSCANNED = "UNSCANNED"
+    UNKNOWN = "UNKNOWN"
 
 class CoverageStatusEnum(str, Enum):
     FULL = "FULL"
@@ -93,6 +95,9 @@ class AttachmentFinding(BaseModel):
     active_content_detected: bool = False
     forms_scripts_detected: bool = False
     archive_members: List[str] = []
+    encrypted: bool = False
+    nested_archive_count: int = 0
+    unparseable_reason: Optional[str] = None
     coverage_status: str = "SCANNED" # SCANNED, UNKNOWN, UNSCANNED, UNSUPPORTED, CORRUPT, OVERSIZED
     matched_rules: List[str] = []
     limitations: str = "Static signature and structure inspection only. Does not guarantee harmlessness."
