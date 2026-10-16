@@ -26,6 +26,7 @@ from app.services.llm_router import LLMRouter
 from app.services.evidence_validator import EvidenceValidator
 from app.config import settings  # FEATURE:insights
 from app.services.insights_builder import build_insights  # FEATURE:insights
+from app.analyzers.qr_analyzer import process_attachments_qr, QR_AVAILABLE  # FEATURE:qr
 import logging  # FEATURE:insights
 
 logger = logging.getLogger(__name__)  # FEATURE:insights
@@ -255,6 +256,8 @@ def analyze_attachments_node(state: InvestigationState) -> Dict[str, Any]:
         return {"attachment_findings": [], "attachment_evidence": [], "trace": state["trace"]}
 
     findings, evidence = AttachmentAnalyzer.analyze_attachments(raw_attachments, email_body=plain_body)
+    if getattr(settings, "FEATURE_QR", True) and QR_AVAILABLE:
+        findings, evidence = process_attachments_qr(raw_attachments, findings, evidence, state)  # FEATURE:qr
     _record_trace(
         state, node, name, TraceStatusEnum.COMPLETED, t0,
         f"Inspected {len(findings)} attachment(s) statically. Discovered {len(evidence)} risk indicator(s).",

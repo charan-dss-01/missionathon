@@ -258,6 +258,7 @@ RULE_METADATA: Dict[str, Dict[str, Any]] = {
         "hint": "Submit oversized or unscanned files to an isolated malware analysis environment before opening.",
     },
 }
+from app.engine.qr_rules import QR_RULE_METADATA; RULE_METADATA.update(QR_RULE_METADATA) # FEATURE:qr
 
 
 def get_metadata(rule_id: Optional[str]) -> Dict[str, Any]:
