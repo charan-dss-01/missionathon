@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Shield,
   ShieldAlert,
@@ -17,8 +18,15 @@ import {
 import LiquidShaderBackground from '@/components/LiquidShaderBackground';
 
 export default function PhishGuardLandingPage() {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
+
+  // Eagerly prefetch target routes immediately on landing mount
+  useEffect(() => {
+    router.prefetch('/investigate');
+    router.prefetch('/overview');
+  }, [router]);
 
   const toggleFaq = (idx) => {
     setOpenFaq(openFaq === idx ? null : idx);
@@ -126,6 +134,9 @@ export default function PhishGuardLandingPage() {
           <div className="hidden md:flex items-center gap-3">
             <Link
               href="/investigate"
+              prefetch={true}
+              onMouseEnter={() => router.prefetch('/investigate')}
+              onTouchStart={() => router.prefetch('/investigate')}
               className="inline-flex items-center justify-center bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] px-5 py-2.5 rounded-full text-xs font-semibold shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               New Investigation
@@ -177,7 +188,10 @@ export default function PhishGuardLandingPage() {
             </Link>
             <Link
               href="/investigate"
+              prefetch={true}
               onClick={() => setMobileMenuOpen(false)}
+              onMouseEnter={() => router.prefetch('/investigate')}
+              onTouchStart={() => router.prefetch('/investigate')}
               className="w-full text-center bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] py-2 rounded-full text-sm font-semibold mt-2"
             >
               New Investigation
@@ -217,12 +231,18 @@ export default function PhishGuardLandingPage() {
           <div className="flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto mb-10">
             <Link
               href="/investigate"
+              prefetch={true}
+              onMouseEnter={() => router.prefetch('/investigate')}
+              onTouchStart={() => router.prefetch('/investigate')}
               className="w-full sm:w-auto inline-flex items-center justify-center bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] px-7 py-3 rounded-full text-sm font-semibold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Start Live Investigation
             </Link>
             <Link
               href="/overview"
+              prefetch={true}
+              onMouseEnter={() => router.prefetch('/overview')}
+              onTouchStart={() => router.prefetch('/overview')}
               className="w-full sm:w-auto inline-flex items-center justify-center bg-white/95 hover:bg-[#f0fdf4] text-[#065f46] border border-emerald-300 px-7 py-3 rounded-full text-sm font-medium shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Control Tower Overview
@@ -354,6 +374,9 @@ export default function PhishGuardLandingPage() {
 
               <Link
                 href="/investigate"
+                prefetch={true}
+                onMouseEnter={() => router.prefetch('/investigate')}
+                onTouchStart={() => router.prefetch('/investigate')}
                 className="mt-6 inline-flex items-center justify-between bg-[#bbf7d0] text-[#064e3b] border border-[#86efac] px-4 py-2.5 rounded-lg text-xs font-semibold hover:bg-[#86efac] transition-all"
               >
                 <span>Start Live Investigation</span>
@@ -415,12 +438,18 @@ export default function PhishGuardLandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5">
             <Link
               href="/investigate"
+              prefetch={true}
+              onMouseEnter={() => router.prefetch('/investigate')}
+              onTouchStart={() => router.prefetch('/investigate')}
               className="w-full sm:w-auto inline-flex items-center justify-center bg-[#bbf7d0] hover:bg-[#86efac] text-[#064e3b] border border-[#4ade80] px-7 py-3 rounded-full text-sm font-semibold shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Open Investigation Console
             </Link>
             <Link
               href="/overview"
+              prefetch={true}
+              onMouseEnter={() => router.prefetch('/overview')}
+              onTouchStart={() => router.prefetch('/overview')}
               className="w-full sm:w-auto inline-flex items-center justify-center bg-white hover:bg-[#dcfce7] text-[#064e3b] border border-[#86efac] px-7 py-3 rounded-full text-sm font-medium shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Control Tower Overview
