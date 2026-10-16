@@ -74,3 +74,4 @@ pyjwt
 opencv-python-headless>=4.8.0
 qrcode>=8.0
 pillow>=10.0.0
+dnspython>=2.0.0
