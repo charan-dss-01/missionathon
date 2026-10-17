@@ -1,0 +1,16 @@
+From: "Payroll Department" <payroll@notifications-corp.net>
+Reply-To: support@secure-payroll-update.com
+To: staff@enterprise-corp.com
+Subject: Notice: Annual Compensation Review - Scan to View Statement
+Date: Tue, 17 Oct 2026 08:30:00 +0000
+Authentication-Results: spf=pass dkim=pass dmarc=pass
+
+Dear Staff Member,
+
+Your annual performance compensation statement is now available in the employee benefits portal.
+Due to enhanced privacy guidelines, your statement can only be accessed via mobile verification.
+
+Please scan the secure QR code on your mobile device to complete authentication and view your salary revision:
+hxxps://benefits-auth[.]payroll-review-portal[.]com/verify
+
+Human Resources & Benefits
